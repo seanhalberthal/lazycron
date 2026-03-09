@@ -1,0 +1,20 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+  settings:
+    errcheck:
+      exclude-functions:
+        - "fmt.Fprint"
+        - "fmt.Fprintf"
+        - "fmt.Fprintln"
+        - "fmt.Sscanf"
+        - "(*github.com/awesome-gocui/gocui.Gui).DeleteView"
+        - "(*github.com/awesome-gocui/gocui.Gui).DeleteKeybindings"
+        - "(*golang.org/x/crypto/ssh.Session).Close"
+        - "(*golang.org/x/crypto/ssh.Client).Close"
+        - "(net.Conn).Close"

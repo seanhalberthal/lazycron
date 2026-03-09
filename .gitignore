@@ -1,0 +1,54 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+/lazycron
+
+# Test and coverage
+*.out
+*.coverprofile
+coverage.*
+profile.cov
+
+# Go
+go.work
+go.work.sum
+vendor/
+
+# Environment
+.env
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude Code
+.claude/*
+!.claude/commands/
+CLAUDE.md
+
+# macOS
+.DS_Store
+
+# Build output
+/bin/
+/dist/
+
+# Debug
+debug
+
+# Logs
+*.log
+
+# Secrets
+*.pem
+*.key
+
+# Temp
+tmp/
+.tmp/

@@ -1,0 +1,14 @@
+# System crontab
+SHELL=/bin/bash
+MAILTO=""
+
+# Backup database every day at 2am
+0 2 * * * /usr/bin/backup.sh # backup-db
+
+# Cleanup temp files
+30 3 * * 0 /usr/bin/cleanup.sh # weekly-cleanup
+
+# Log rotation (disabled)
+# 0 0 * * * /usr/sbin/logrotate /etc/logrotate.conf # logrotate
+
+*/5 * * * * /usr/bin/healthcheck.sh # healthcheck

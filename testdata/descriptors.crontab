@@ -1,0 +1,6 @@
+@daily /usr/bin/daily-task.sh # daily-task
+@hourly /usr/bin/hourly-check.sh # hourly-check
+@weekly /usr/bin/weekly-report.sh # weekly-report
+@monthly /usr/bin/monthly-audit.sh # monthly-audit
+@yearly /usr/bin/annual-review.sh # annual-review
+@every 5m /usr/bin/frequent-check.sh # frequent-check

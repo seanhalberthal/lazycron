@@ -1,0 +1,6 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+MAILTO=admin@example.com
+HOME=/home/deploy
+
+0 * * * * /usr/bin/task.sh # every-hour

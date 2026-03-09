@@ -1,0 +1,25 @@
+# Application crontab
+# Managed by deployment pipeline
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# === Database Jobs ===
+
+0 2 * * * /opt/scripts/backup-db.sh --full # db-full-backup
+0 */6 * * * /opt/scripts/backup-db.sh --incremental # db-incremental-backup
+
+# === Monitoring ===
+
+*/5 * * * * /opt/scripts/healthcheck.sh
+*/15 * * * * /opt/scripts/metrics-collect.sh # metrics
+
+# === Disabled Jobs ===
+
+# 0 3 * * * /opt/scripts/old-cleanup.sh # old-cleanup
+# @daily /opt/scripts/deprecated-task.sh # deprecated
+
+# === Maintenance ===
+
+0 4 * * 0 /opt/scripts/weekly-maintenance.sh # maintenance
+@monthly /opt/scripts/rotate-certs.sh # cert-rotation
