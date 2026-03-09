@@ -54,6 +54,23 @@ func (gui *Gui) setupKeybindings() error {
 		// Tab switching (from servers view)
 		{serversView, 'h', gocui.ModNone, gui.switchTabLeft},
 		{serversView, 'l', gocui.ModNone, gui.switchTabRight},
+
+		// Mail list navigation
+		{mailListView, 'j', gocui.ModNone, gui.mailCursorDown},
+		{mailListView, 'k', gocui.ModNone, gui.mailCursorUp},
+		{mailListView, gocui.KeyArrowDown, gocui.ModNone, gui.mailCursorDown},
+		{mailListView, gocui.KeyArrowUp, gocui.ModNone, gui.mailCursorUp},
+
+		// Mail actions
+		{mailListView, gocui.KeyEnter, gocui.ModNone, gui.openMailDetail},
+		{mailListView, 'd', gocui.ModNone, gui.deleteMail},
+		{mailListView, 'D', gocui.ModNone, gui.deleteAllMail},
+		{mailListView, 'r', gocui.ModNone, gui.refreshMail},
+		{mailListView, 'S', gocui.ModNone, gui.switchMailSource},
+
+		// Tab switching (from mail view)
+		{mailListView, 'h', gocui.ModNone, gui.switchTabLeft},
+		{mailListView, 'l', gocui.ModNone, gui.switchTabRight},
 	}
 
 	for _, b := range bindings {

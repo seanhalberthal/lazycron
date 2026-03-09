@@ -143,7 +143,7 @@ func (gui *Gui) toggleHelp(_ *gocui.Gui, _ *gocui.View) error {
 	fmt.Fprintln(v, style.Coloured(style.FgCyan+style.Bold, "  Navigation"))
 	fmt.Fprintln(v, style.Coloured(style.Dim, "  ──────────"))
 	fmt.Fprintf(v, "  %s    %s\n", style.Coloured(style.FgGreen, "j/k, ↑/↓"), style.Coloured(style.Dim, "Navigate list"))
-	fmt.Fprintf(v, "  %s         %s\n", style.Coloured(style.FgGreen, "h/l"), style.Coloured(style.Dim, "Switch tab (Local/Servers)"))
+	fmt.Fprintf(v, "  %s         %s\n", style.Coloured(style.FgGreen, "h/l"), style.Coloured(style.Dim, "Switch tab (Local/Servers/Mail)"))
 	fmt.Fprintf(v, "  %s         %s\n", style.Coloured(style.FgGreen, "Tab"), style.Coloured(style.Dim, "Switch panel"))
 	fmt.Fprintln(v, "")
 	fmt.Fprintln(v, style.Coloured(style.FgCyan+style.Bold, "  Local Tab"))
@@ -155,6 +155,13 @@ func (gui *Gui) toggleHelp(_ *gocui.Gui, _ *gocui.View) error {
 	fmt.Fprintln(v, style.Coloured(style.Dim, "  ───────────"))
 	fmt.Fprintf(v, "  %s           %s\n", style.Coloured(style.FgGreen, "a"), style.Coloured(style.Dim, "Add server"))
 	fmt.Fprintf(v, "  %s       %s\n", style.Coloured(style.FgGreen, "c/d/D"), style.Coloured(style.Dim, "Connect/Disconnect/Delete"))
+	fmt.Fprintln(v, "")
+	fmt.Fprintln(v, style.Coloured(style.FgCyan+style.Bold, "  Mail Tab"))
+	fmt.Fprintln(v, style.Coloured(style.Dim, "  ────────"))
+	fmt.Fprintf(v, "  %s      %s\n", style.Coloured(style.FgGreen, "Enter"), style.Coloured(style.Dim, "Read message"))
+	fmt.Fprintf(v, "  %s        %s\n", style.Coloured(style.FgGreen, "d/D"), style.Coloured(style.Dim, "Delete / Delete all (local only)"))
+	fmt.Fprintf(v, "  %s          %s\n", style.Coloured(style.FgGreen, "S"), style.Coloured(style.Dim, "Switch source (Local / Remote)"))
+	fmt.Fprintf(v, "  %s          %s\n", style.Coloured(style.FgGreen, "r"), style.Coloured(style.Dim, "Refresh mailbox"))
 	fmt.Fprintln(v, "")
 	fmt.Fprintf(v, "  %s           %s     %s %s\n", style.Coloured(style.FgGreen, "r"), style.Coloured(style.Dim, "Refresh"), style.Coloured(style.FgGreen, "?"), style.Coloured(style.Dim, "Help"))
 	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "q / Ctrl+C"), style.Coloured(style.Dim, "Quit"))
@@ -183,25 +190,49 @@ func (gui *Gui) closeHelp(_ *gocui.Gui, _ *gocui.View) error {
 	return nil
 }
 
-// switchTabLeft switches to the tab to the left (Local).
+// switchTabLeft switches to the next tab to the left.
 func (gui *Gui) switchTabLeft(_ *gocui.Gui, _ *gocui.View) error {
-	if gui.activeTab == tabLocal {
-		return nil
+	switch gui.activeTab {
+	case tabLocal:
+		// Wrap to Mail
+		gui.activeTab = tabMail
+		gui.panels = []string{mailListView}
+		gui.panelIdx = 0
+		if gui.mailbox == nil {
+			_ = gui.loadMailbox()
+		}
+	case tabServers:
+		gui.activeTab = tabLocal
+		gui.panels = []string{tableView}
+		gui.panelIdx = 0
+	case tabMail:
+		gui.activeTab = tabServers
+		gui.panels = []string{serversView, detailView}
+		gui.panelIdx = 0
 	}
-	gui.activeTab = tabLocal
-	gui.panels = []string{tableView}
-	gui.panelIdx = 0
 	return nil
 }
 
-// switchTabRight switches to the tab to the right (Servers).
+// switchTabRight switches to the next tab to the right.
 func (gui *Gui) switchTabRight(_ *gocui.Gui, _ *gocui.View) error {
-	if gui.activeTab == tabServers {
-		return nil
+	switch gui.activeTab {
+	case tabLocal:
+		gui.activeTab = tabServers
+		gui.panels = []string{serversView, detailView}
+		gui.panelIdx = 0
+	case tabServers:
+		gui.activeTab = tabMail
+		gui.panels = []string{mailListView}
+		gui.panelIdx = 0
+		if gui.mailbox == nil {
+			_ = gui.loadMailbox()
+		}
+	case tabMail:
+		// Wrap to Local
+		gui.activeTab = tabLocal
+		gui.panels = []string{tableView}
+		gui.panelIdx = 0
 	}
-	gui.activeTab = tabServers
-	gui.panels = []string{serversView, detailView}
-	gui.panelIdx = 0
 	return nil
 }
 

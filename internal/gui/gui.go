@@ -6,6 +6,7 @@ import (
 
 	"github.com/awesome-gocui/gocui"
 	"github.com/bssmnt/lazycron/internal/cron"
+	"github.com/bssmnt/lazycron/internal/mail"
 	"github.com/bssmnt/lazycron/internal/ssh"
 	"github.com/bssmnt/lazycron/internal/types"
 )
@@ -26,6 +27,7 @@ type tab int
 const (
 	tabLocal tab = iota
 	tabServers
+	tabMail
 )
 
 // Gui holds the application state and the gocui instance.
@@ -49,6 +51,12 @@ type Gui struct {
 	remoteCrontab  *cron.Crontab
 	remoteJobs     []*cron.CronJob
 	remoteSelected int
+
+	// Mail state
+	mailbox          *mail.Mailbox
+	mailMessages     []*mail.Message
+	mailSelected     int
+	mailActiveSource mailSource // local or remote
 }
 
 // New creates and returns a new Gui instance.
@@ -72,6 +80,12 @@ func New() (*Gui, error) {
 	}
 	if gui.serversConfig == nil {
 		gui.serversConfig = &ssh.ServersConfig{}
+	}
+
+	// Load mail count for status bar (best effort)
+	if mb, err := mail.DefaultMailbox(); err == nil {
+		gui.mailbox = mb
+		gui.mailMessages, _ = mb.Read()
 	}
 
 	g.SetManagerFunc(gui.layout)
@@ -128,6 +142,8 @@ func (gui *Gui) refreshViews() {
 		case tabServers:
 			gui.renderServerList()
 			gui.renderDetail()
+		case tabMail:
+			gui.renderMailList()
 		}
 		gui.renderStatus()
 		gui.renderHints()
@@ -146,10 +162,11 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 
 	switch gui.activeTab {
 	case tabLocal:
-		// Hide servers/split views if they exist
+		// Hide servers/split views and mail if they exist
 		g.DeleteView(serversView)
 		g.DeleteView(jobsView)
 		g.DeleteView(detailView)
+		g.DeleteView(mailListView)
 
 		// Full-width table
 		if err := gui.createTableView(g, maxX, maxY); err != nil {
@@ -157,8 +174,9 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 		}
 
 	case tabServers:
-		// Hide table view if it exists
+		// Hide table and mail views if they exist
 		g.DeleteView(tableView)
+		g.DeleteView(mailListView)
 
 		// Servers list (left panel)
 		if err := gui.createServersView(g, maxX, maxY); err != nil {
@@ -167,6 +185,17 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 
 		// Detail panel (right panel — server detail or remote jobs)
 		if err := gui.createDetailView(g, maxX, maxY); err != nil {
+			return err
+		}
+
+	case tabMail:
+		// Hide table and server views
+		g.DeleteView(tableView)
+		g.DeleteView(serversView)
+		g.DeleteView(jobsView)
+		g.DeleteView(detailView)
+
+		if err := gui.createMailListView(g, maxX, maxY); err != nil {
 			return err
 		}
 	}

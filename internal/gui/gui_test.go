@@ -265,7 +265,7 @@ func TestSwitchTabRoundTripState(t *testing.T) {
 	}
 }
 
-func TestSwitchTabNoOpWhenAlreadyOnTab(t *testing.T) {
+func TestSwitchTabWrapsAround(t *testing.T) {
 	gui := &Gui{
 		panels:        []string{tableView},
 		panelIdx:      0,
@@ -273,17 +273,16 @@ func TestSwitchTabNoOpWhenAlreadyOnTab(t *testing.T) {
 		serversConfig: &ssh.ServersConfig{},
 	}
 
+	// Left from Local wraps to Mail
 	_ = gui.switchTabLeft(nil, nil)
-	if gui.activeTab != tabLocal {
-		t.Error("switchTabLeft from Local should be a no-op")
+	if gui.activeTab != tabMail {
+		t.Errorf("switchTabLeft from Local should wrap to Mail, got %d", gui.activeTab)
 	}
 
-	gui.activeTab = tabServers
-	gui.panels = []string{serversView, detailView}
-
+	// Right from Mail wraps to Local
 	_ = gui.switchTabRight(nil, nil)
-	if gui.activeTab != tabServers {
-		t.Error("switchTabRight from Servers should be a no-op")
+	if gui.activeTab != tabLocal {
+		t.Errorf("switchTabRight from Mail should wrap to Local, got %d", gui.activeTab)
 	}
 }
 

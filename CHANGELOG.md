@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+- Mail tab: view, read, delete, and manage local and remote mbox mailboxes
+
+## [0.2.0]
+
 - Coloured UI: styled labels, hints bar, help overlay, modal dialogs, and status indicators
 - Custom input editor with macOS modifier key support (Opt+Arrow word navigation, Ctrl+W, Ctrl+K)
 - Real-time cron expression validation with inline feedback in create/edit modal
