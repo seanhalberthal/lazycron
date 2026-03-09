@@ -6,6 +6,7 @@ import (
 
 	"github.com/awesome-gocui/gocui"
 	"github.com/bssmnt/lazycron/internal/cron"
+	"github.com/bssmnt/lazycron/internal/gui/style"
 )
 
 // Modal view names.
@@ -17,6 +18,7 @@ const (
 	expressionInputView = "expressionInput"
 	commandInputView    = "commandInput"
 	validationView      = "validation"
+	exprGuideView       = "exprGuide"
 )
 
 // modalField tracks which input field is active in the create/edit modal.
@@ -33,13 +35,24 @@ type modalState struct {
 	editing     bool // true = editing existing job, false = creating new
 	editIndex   int  // index of the job being edited (if editing)
 	activeField modalField
+	exprValid   bool // true when the expression field contains a valid cron expression
 }
+
+// guideWidth is the fixed width of the expression guide panel.
+const guideWidth = 36
 
 // openCreateModal opens the create/edit modal.
 func (gui *Gui) openCreateModal(editing bool) error {
 	maxX, maxY := gui.g.Size()
-	width := 50
-	height := 12
+	// Use 80% of terminal width, clamped between 60 and maxX-4.
+	// Add guide panel width when the terminal is wide enough.
+	formWidth := max(60, min(maxX*60/100, maxX-4))
+	showGuide := maxX >= formWidth+guideWidth+6
+	width := formWidth
+	if showGuide {
+		width = formWidth + guideWidth + 1 // +1 for shared border
+	}
+	height := 17
 
 	x0 := maxX/2 - width/2
 	y0 := maxY/2 - height/2
@@ -59,8 +72,17 @@ func (gui *Gui) openCreateModal(editing bool) error {
 		activeField: fieldName,
 	}
 
-	// Modal frame
-	frame, err := gui.g.SetView(createModalView, x0, y0, x1, y1, 0)
+	// Form area: left portion of the modal.
+	formX1 := x1
+	if showGuide {
+		formX1 = x0 + formWidth
+	}
+	labelCol := x0 + 3
+	inputX0 := x0 + 16
+	inputX1 := formX1 - 3
+
+	// Modal frame (covers just the form area).
+	frame, err := gui.g.SetView(createModalView, x0, y0, formX1, y1, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -71,50 +93,85 @@ func (gui *Gui) openCreateModal(editing bool) error {
 	}
 	frame.Clear()
 
-	// Labels
-	fmt.Fprintln(frame, "")
-	fmt.Fprintln(frame, "  Name:")
-	fmt.Fprintln(frame, "")
-	fmt.Fprintln(frame, "  Expression:")
-	fmt.Fprintln(frame, "")
-	fmt.Fprintln(frame, "  Command:")
-	fmt.Fprintln(frame, "")
-	fmt.Fprintln(frame, "")
-	fmt.Fprintln(frame, "  [Tab] next  [Enter] save  [Esc] cancel")
+	// Expression guide panel (right side).
+	if showGuide {
+		gui.createExprGuide(formX1, y0, x1, y1)
+	}
+
+	// Row layout:  y0+0  = frame border
+	//              y0+1  = blank
+	//              y0+2  – y0+4  = Name label + input
+	//              y0+5  – y0+7  = Expression label + input
+	//              y0+7  – y0+9  = Validation (frameless, 1 content row)
+	//              y0+9  – y0+11 = Command label + input
+	//              y0+13 – y0+15 = Hints
+	//              y0+16 = frame border
+
+	// Name label
+	lbl, _ := gui.g.SetView("lblName", labelCol, y0+2, inputX0-1, y0+4, 0)
+	if lbl != nil {
+		lbl.Frame = false
+		lbl.Clear()
+		fmt.Fprint(lbl, style.Coloured(style.FgGreen, " Name:"))
+	}
+
+	// Expression label
+	lbl, _ = gui.g.SetView("lblExpr", labelCol, y0+5, inputX0-1, y0+7, 0)
+	if lbl != nil {
+		lbl.Frame = false
+		lbl.Clear()
+		fmt.Fprint(lbl, style.Coloured(style.FgGreen, " Expression:"))
+	}
+
+	// Command label
+	lbl, _ = gui.g.SetView("lblCmd", labelCol, y0+9, inputX0-1, y0+11, 0)
+	if lbl != nil {
+		lbl.Frame = false
+		lbl.Clear()
+		fmt.Fprint(lbl, style.Coloured(style.FgGreen, " Command:"))
+	}
+
+	// Hints
+	lbl, _ = gui.g.SetView("lblHints", labelCol, y0+13, inputX1+1, y0+15, 0)
+	if lbl != nil {
+		lbl.Frame = false
+		lbl.Clear()
+		fmt.Fprint(lbl, style.Coloured(style.Dim, " [Tab/S-Tab] next/prev   [Enter] save   [Esc] cancel"))
+	}
 
 	// Name input
-	nameV, err := gui.g.SetView(nameInputView, x0+14, y0+1, x1-2, y0+3, 0)
+	nameV, err := gui.g.SetView(nameInputView, inputX0, y0+2, inputX1, y0+4, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
 	nameV.Editable = true
 	nameV.Frame = true
-	nameV.Editor = gocui.DefaultEditor
+	nameV.Editor = inputEditor
 
-	// Expression input
-	exprV, err := gui.g.SetView(expressionInputView, x0+14, y0+3, x1-2, y0+5, 0)
+	// Expression input — uses a wrapping editor that validates on every keystroke.
+	exprV, err := gui.g.SetView(expressionInputView, inputX0, y0+5, inputX1, y0+7, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
 	exprV.Editable = true
 	exprV.Frame = true
-	exprV.Editor = gocui.DefaultEditor
+	exprV.Editor = gui.expressionEditor()
 
-	// Validation label (below expression)
-	valV, err := gui.g.SetView(validationView, x0+14, y0+5, x1-2, y0+6, 0)
+	// Validation label (below expression, frameless, 1 content row)
+	valV, err := gui.g.SetView(validationView, inputX0, y0+7, inputX1, y0+9, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
 	valV.Frame = false
 
 	// Command input
-	cmdV, err := gui.g.SetView(commandInputView, x0+14, y0+6, x1-2, y0+8, 0)
+	cmdV, err := gui.g.SetView(commandInputView, inputX0, y0+9, inputX1, y0+11, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
 	cmdV.Editable = true
 	cmdV.Frame = true
-	cmdV.Editor = gocui.DefaultEditor
+	cmdV.Editor = inputEditor
 
 	// Pre-fill if editing
 	if editing && gui.selected < len(gui.jobs) {
@@ -140,6 +197,39 @@ func (gui *Gui) openCreateModal(editing bool) error {
 	return nil
 }
 
+// createExprGuide renders the expression reference guide panel.
+func (gui *Gui) createExprGuide(x0, y0, x1, y1 int) {
+	v, err := gui.g.SetView(exprGuideView, x0, y0, x1, y1, 0)
+	if err != nil && err != gocui.ErrUnknownView {
+		return
+	}
+	v.Title = " Expression Guide "
+	v.Wrap = true
+	v.Clear()
+
+	g := style.Coloured
+	dim := style.Dim
+	green := style.FgGreen
+	cyan := style.FgCyan
+
+	fmt.Fprintln(v)
+	fmt.Fprintf(v, " %s\n", g(cyan, "┌───┬───┬───┬────┬─────┐"))
+	fmt.Fprintf(v, " %s\n", g(cyan, "│min│ hr│day│ mon│ wday│"))
+	fmt.Fprintf(v, " %s\n", g(cyan, "└─┬─┴─┬─┴─┬─┴──┬─┴──┬──┘"))
+	fmt.Fprintf(v, " %s\n", g(dim, "  *   *   *    *    *"))
+	fmt.Fprintln(v)
+	fmt.Fprintf(v, " %s  %s\n", g(green, "0 9 * * *"), g(dim, "Daily at 09:00"))
+	fmt.Fprintf(v, " %s  %s\n", g(green, "*/15 * * * *"), g(dim, "Every 15 mins"))
+	fmt.Fprintf(v, " %s  %s\n", g(green, "0 0 * * 1"), g(dim, "Mondays at 00:00"))
+	fmt.Fprintf(v, " %s  %s\n", g(green, "0 8 1 * *"), g(dim, "1st of month, 08:00"))
+	fmt.Fprintln(v)
+	fmt.Fprintf(v, " %s\n", g(cyan, "Shortcuts:"))
+	fmt.Fprintf(v, " %s %s %s\n",
+		g(green, "@daily"), g(green, "@weekly"), g(green, "@monthly"))
+	fmt.Fprintf(v, " %s %s %s\n",
+		g(green, "@yearly"), g(green, "@hourly"), g(green, "@reboot"))
+}
+
 // setupModalKeybindings registers keybindings for the create/edit modal inputs.
 func (gui *Gui) setupModalKeybindings() error {
 	inputViews := []string{nameInputView, expressionInputView, commandInputView}
@@ -155,6 +245,9 @@ func (gui *Gui) setupModalKeybindings() error {
 		if err := gui.g.SetKeybinding(vn, gocui.KeyTab, gocui.ModNone, gui.nextModalField); err != nil {
 			return err
 		}
+		if err := gui.g.SetKeybinding(vn, gocui.KeyBacktab, gocui.ModNone, gui.prevModalField); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -167,6 +260,21 @@ func (gui *Gui) nextModalField(_ *gocui.Gui, _ *gocui.View) error {
 	}
 
 	gui.modal.activeField = (gui.modal.activeField + 1) % 3
+	viewName := gui.modalFieldViewName(gui.modal.activeField)
+	if _, err := gui.g.SetCurrentView(viewName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// prevModalField cycles to the previous input field.
+func (gui *Gui) prevModalField(_ *gocui.Gui, _ *gocui.View) error {
+	if gui.modal == nil {
+		return nil
+	}
+
+	gui.modal.activeField = (gui.modal.activeField + 2) % 3 // +2 ≡ -1 mod 3
 	viewName := gui.modalFieldViewName(gui.modal.activeField)
 	if _, err := gui.g.SetCurrentView(viewName); err != nil {
 		return err
@@ -204,10 +312,8 @@ func (gui *Gui) saveModal(_ *gocui.Gui, _ *gocui.View) error {
 		return nil
 	}
 
-	// Validate expression
-	testJob := &cron.CronJob{Expression: expr}
-	if _, err := testJob.NextRun(); err != nil {
-		gui.setStatusMessage(fmt.Sprintf("Invalid expression: %s", expr))
+	if !gui.modal.exprValid {
+		gui.setStatusMessage("Cannot save: invalid cron expression")
 		return nil
 	}
 
@@ -255,7 +361,11 @@ func (gui *Gui) closeCreateModalViews() {
 	gui.modal = nil
 	gui.g.Cursor = false
 
-	views := []string{createModalView, nameInputView, expressionInputView, commandInputView, validationView}
+	views := []string{
+		createModalView, nameInputView, expressionInputView,
+		commandInputView, validationView, exprGuideView,
+		"lblName", "lblExpr", "lblCmd", "lblHints",
+	}
 	for _, name := range views {
 		gui.g.DeleteView(name)
 		gui.g.DeleteKeybindings(name)
@@ -276,6 +386,18 @@ func (gui *Gui) getViewContent(viewName string) string {
 	return strings.TrimSpace(v.Buffer())
 }
 
+// expressionEditor returns an Editor that delegates to inputEditor and
+// triggers real-time validation after every keystroke.
+func (gui *Gui) expressionEditor() gocui.Editor {
+	return gocui.EditorFunc(func(v *gocui.View, key gocui.Key, ch rune, mod gocui.Modifier) {
+		inputEditorFn(v, key, ch, mod)
+		gui.g.Update(func(_ *gocui.Gui) error {
+			gui.validateExpression()
+			return nil
+		})
+	})
+}
+
 // validateExpression checks the expression and updates the validation label.
 func (gui *Gui) validateExpression() {
 	v, err := gui.g.View(validationView)
@@ -284,14 +406,25 @@ func (gui *Gui) validateExpression() {
 	}
 	v.Clear()
 
+	if gui.modal == nil {
+		return
+	}
+
 	expr := gui.getViewContent(expressionInputView)
 	if expr == "" {
+		gui.modal.exprValid = false
 		return
 	}
 
 	testJob := &cron.CronJob{Expression: expr}
-	desc := testJob.Describe()
-	fmt.Fprint(v, desc)
+	if _, err := testJob.NextRun(); err != nil {
+		gui.modal.exprValid = false
+		fmt.Fprint(v, style.Coloured(style.FgRed, "✗ invalid expression"))
+		return
+	}
+
+	gui.modal.exprValid = true
+	fmt.Fprint(v, style.Coloured(style.FgGreen, "✓ ")+style.Coloured(style.Dim, testJob.Describe()))
 }
 
 // openDeleteModal opens the delete confirmation modal.
@@ -302,8 +435,8 @@ func (gui *Gui) openDeleteModal() error {
 
 	job := gui.jobs[gui.selected]
 	maxX, maxY := gui.g.Size()
-	width := 44
-	height := 8
+	width := 50
+	height := 10
 
 	x0 := maxX/2 - width/2
 	y0 := maxY/2 - height/2
@@ -326,11 +459,13 @@ func (gui *Gui) openDeleteModal() error {
 	v.Clear()
 
 	fmt.Fprintln(v, "")
-	fmt.Fprintf(v, "  Delete %q?\n", job.DisplayName())
-	fmt.Fprintf(v, "  Expression: %s\n", job.Expression)
-	fmt.Fprintf(v, "  Command: %s\n", job.Command)
+	fmt.Fprintf(v, "  Delete %s?\n", style.Coloured(style.FgGreen+style.Bold, job.DisplayName()))
 	fmt.Fprintln(v, "")
-	fmt.Fprintln(v, "  [y] confirm  [n/Esc] cancel")
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.Dim, "Expression:"), job.Expression)
+	fmt.Fprintf(v, "  %s     %s\n", style.Coloured(style.Dim, "Command:"), job.Command)
+	fmt.Fprintln(v, "")
+	fmt.Fprintln(v, "")
+	fmt.Fprintln(v, style.Coloured(style.Dim, "  [y] confirm   [n/Esc] cancel"))
 
 	if _, err := gui.g.SetCurrentView(deleteModalView); err != nil {
 		return err
@@ -397,7 +532,7 @@ func (gui *Gui) openDetailOverlay(_ *gocui.Gui, _ *gocui.View) error {
 	job := gui.jobs[gui.selected]
 	maxX, maxY := gui.g.Size()
 	width := min(70, maxX-4)
-	height := 12
+	height := 14
 
 	x0 := maxX/2 - width/2
 	y0 := maxY/2 - height/2
@@ -416,18 +551,19 @@ func (gui *Gui) openDetailOverlay(_ *gocui.Gui, _ *gocui.View) error {
 	}
 
 	fmt.Fprintln(v)
-	fmt.Fprintf(v, "  Expression:  %s\n", job.Expression)
-	fmt.Fprintf(v, "  Schedule:    %s\n", job.Describe())
-	fmt.Fprintf(v, "  Command:     %s\n", job.Command)
-	fmt.Fprintf(v, "  Status:      %s\n", status)
+	fmt.Fprintf(v, "   %s  %s\n", style.Coloured(style.FgGreen, "Expression:"), job.Expression)
+	fmt.Fprintf(v, "   %s  %s\n", style.Coloured(style.FgGreen, "Schedule:  "), job.Describe())
+	fmt.Fprintf(v, "   %s  %s\n", style.Coloured(style.FgGreen, "Command:   "), job.Command)
+	fmt.Fprintf(v, "   %s  %s\n", style.Coloured(style.FgGreen, "Status:    "), status)
+	fmt.Fprintln(v)
 	if t, err := job.NextRun(); err == nil {
-		fmt.Fprintf(v, "  Next run:    %s\n", t.Format("2006-01-02 15:04"))
+		fmt.Fprintf(v, "   %s  %s\n", style.Coloured(style.FgGreen, "Next run:  "), style.Coloured(style.Dim, t.Format("2006-01-02 15:04")))
 	}
 	if t, err := job.PrevRun(); err == nil {
-		fmt.Fprintf(v, "  Prev run:    %s\n", t.Format("2006-01-02 15:04"))
+		fmt.Fprintf(v, "   %s  %s\n", style.Coloured(style.FgGreen, "Prev run:  "), style.Coloured(style.Dim, t.Format("2006-01-02 15:04")))
 	}
 	fmt.Fprintln(v)
-	fmt.Fprintln(v, "  [Esc] close")
+	fmt.Fprintln(v, style.Coloured(style.Dim, "   [Esc] close"))
 
 	if _, err := gui.g.SetCurrentView(detailOverlayView); err != nil {
 		return err

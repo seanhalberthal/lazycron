@@ -2,6 +2,7 @@ package gui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/awesome-gocui/gocui"
 	"github.com/bssmnt/lazycron/internal/gui/style"
@@ -38,7 +39,7 @@ func (gui *Gui) createStatusView(g *gocui.Gui, maxX, _ int) error {
 func (gui *Gui) createDetailView(g *gocui.Gui, maxX, maxY int) error {
 	splitX := max(int(float64(maxX)*jobsPanelRatio), 20)
 
-	v, err := g.SetView(detailView, splitX, 2, maxX, maxY-2, 0)
+	v, err := g.SetView(detailView, splitX, 2, maxX-1, maxY-2, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -75,7 +76,7 @@ func (gui *Gui) createHintsView(g *gocui.Gui, maxX, maxY int) error {
 func (gui *Gui) createServersView(g *gocui.Gui, maxX, maxY int) error {
 	splitX := max(int(float64(maxX)*jobsPanelRatio), 20)
 
-	v, err := g.SetView(serversView, -1, 2, splitX, maxY-2, 0)
+	v, err := g.SetView(serversView, 0, 2, splitX, maxY-2, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -102,12 +103,13 @@ func (gui *Gui) createServersView(g *gocui.Gui, maxX, maxY int) error {
 
 // createTableView creates the full-width table view for the Local tab.
 func (gui *Gui) createTableView(g *gocui.Gui, maxX, maxY int) error {
-	v, err := g.SetView(tableView, -1, 2, maxX, maxY-2, 0)
+	v, err := g.SetView(tableView, 0, 2, maxX-1, maxY-2, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
 	if err == gocui.ErrUnknownView {
 		v.Frame = true
+		v.Title = " Jobs "
 		v.Highlight = true
 		v.SelBgColor = style.SelectedBgColour
 		v.SelFgColor = style.SelectedFgColour
@@ -115,10 +117,6 @@ func (gui *Gui) createTableView(g *gocui.Gui, maxX, maxY int) error {
 			return err
 		}
 		gui.renderTable()
-		// Position cursor on first data row (skip header)
-		if len(gui.jobs) > 0 {
-			_ = v.SetCursor(0, 1)
-		}
 	}
 
 	v.FrameColor = style.ActiveBorderColour
@@ -134,16 +132,24 @@ func (gui *Gui) renderTable() {
 	v.Clear()
 
 	if len(gui.jobs) == 0 {
-		fmt.Fprintln(v, "  No cron jobs found")
+		fmt.Fprintln(v, "")
+		fmt.Fprintln(v, style.Coloured(style.Dim, "  No cron jobs found. Press [c] to create one."))
 		return
 	}
 
 	maxX, _ := gui.g.Size()
-	cols := calculateColumns(maxX)
+	cols := calculateColumns(maxX - 2)
 
 	// Header line
 	header := formatTableRow(cols, "ID", "Expression", "Command", "Last Run", "Next Run", "Status")
 	fmt.Fprintln(v, style.Coloured(style.Bold, header))
+
+	// Separator line — dim horizontal rule under header
+	sepWidth := maxX - 6
+	if sepWidth < 10 {
+		sepWidth = 10
+	}
+	fmt.Fprintln(v, " "+style.Coloured(style.Dim, strings.Repeat("─", sepWidth)))
 
 	// Job rows
 	for _, job := range gui.jobs {
@@ -171,6 +177,12 @@ func (gui *Gui) renderTable() {
 			status,
 		)
 		fmt.Fprintln(v, row)
+	}
+
+	// Sync cursor with logical selection — v.Clear() resets cursor to (0,0),
+	// so we must restore it after every render.
+	if len(gui.jobs) > 0 {
+		_ = v.SetCursor(0, gui.selected+2) // +2 for header + separator
 	}
 }
 
@@ -276,17 +288,22 @@ func (gui *Gui) renderServerList() {
 	v.Clear()
 
 	if len(gui.serversConfig.Servers) == 0 {
-		fmt.Fprintln(v, "  No servers configured")
-		fmt.Fprintln(v, "  Press [a] to add one")
+		fmt.Fprintln(v, style.Coloured(style.Dim, "  No servers configured"))
+		fmt.Fprintln(v, style.Coloured(style.Dim, "  Press [a] to add one"))
 		return
 	}
 
 	for _, server := range gui.serversConfig.Servers {
-		connIndicator := "○"
+		connIndicator := style.Coloured(style.Dim, "○")
 		if gui.activeClient != nil && gui.activeClient.ServerName() == server.Name {
-			connIndicator = "●"
+			connIndicator = style.Coloured(style.FgGreen, "●")
 		}
 		fmt.Fprintf(v, " %s %s\n", connIndicator, server.Name)
+	}
+
+	// Sync cursor with logical selection — v.Clear() resets cursor to (0,0).
+	if len(gui.serversConfig.Servers) > 0 {
+		_ = v.SetCursor(0, gui.serverSelected)
 	}
 }
 
@@ -309,30 +326,31 @@ func (gui *Gui) renderDetail() {
 // renderJobDetail shows detail for the selected local job.
 func (gui *Gui) renderJobDetail(v *gocui.View) {
 	if len(gui.jobs) == 0 || gui.selected >= len(gui.jobs) {
-		fmt.Fprintln(v, "\n  No job selected")
+		fmt.Fprintln(v, "")
+		fmt.Fprintln(v, style.Coloured(style.Dim, "  No job selected"))
 		return
 	}
 
 	job := gui.jobs[gui.selected]
 
-	status := "Enabled"
+	status := style.Coloured(style.FgGreen, "Enabled")
 	if !job.Enabled {
-		status = "Disabled"
+		status = style.Coloured(style.FgRed, "Disabled")
 	}
 
 	fmt.Fprintln(v)
-	fmt.Fprintf(v, "  Name:        %s\n", job.DisplayName())
-	fmt.Fprintf(v, "  Expression:  %s\n", job.Expression)
-	fmt.Fprintf(v, "  Schedule:    %s\n", job.Describe())
-	fmt.Fprintf(v, "  Command:     %s\n", job.Command)
-	fmt.Fprintf(v, "  Status:      %s\n", status)
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Name:      "), job.DisplayName())
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Expression:"), job.Expression)
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Schedule:  "), job.Describe())
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Command:   "), job.Command)
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Status:    "), status)
 
 	if nextRun, err := job.NextRun(); err == nil {
-		fmt.Fprintf(v, "  Next run:    %s\n", nextRun.Format("2006-01-02 15:04"))
+		fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Next run:  "), style.Coloured(style.Dim, nextRun.Format("2006-01-02 15:04")))
 	}
 
 	if prevRun, err := job.PrevRun(); err == nil {
-		fmt.Fprintf(v, "  Prev run:    %s\n", prevRun.Format("2006-01-02 15:04"))
+		fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Prev run:  "), style.Coloured(style.Dim, prevRun.Format("2006-01-02 15:04")))
 	}
 }
 
@@ -340,30 +358,31 @@ func (gui *Gui) renderJobDetail(v *gocui.View) {
 func (gui *Gui) renderServerDetail(v *gocui.View) {
 	servers := gui.serversConfig.Servers
 	if len(servers) == 0 || gui.serverSelected >= len(servers) {
-		fmt.Fprintln(v, "\n  No server selected")
+		fmt.Fprintln(v, "")
+		fmt.Fprintln(v, style.Coloured(style.Dim, "  No server selected"))
 		return
 	}
 
 	server := servers[gui.serverSelected]
 
-	connected := "Disconnected"
+	connected := style.Coloured(style.Dim, "Disconnected")
 	if gui.activeClient != nil && gui.activeClient.ServerName() == server.Name {
-		connected = "Connected"
+		connected = style.Coloured(style.FgGreen, "Connected")
 	}
 
 	fmt.Fprintln(v)
-	fmt.Fprintf(v, "  Name:     %s\n", server.Name)
-	fmt.Fprintf(v, "  Host:     %s\n", server.Host)
-	fmt.Fprintf(v, "  Port:     %d\n", server.Port)
-	fmt.Fprintf(v, "  User:     %s\n", server.User)
-	fmt.Fprintf(v, "  Auth:     %s\n", server.AuthType)
-	fmt.Fprintf(v, "  Status:   %s\n", connected)
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Name:  "), server.Name)
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Host:  "), server.Host)
+	fmt.Fprintf(v, "  %s  %d\n", style.Coloured(style.FgGreen, "Port:  "), server.Port)
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "User:  "), server.User)
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Auth:  "), server.AuthType)
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "Status:"), connected)
 
-	// If connected to this server, show its remote jobs
+	// Remote jobs section
 	if gui.activeClient != nil && gui.activeClient.ServerName() == server.Name && gui.remoteJobs != nil {
 		fmt.Fprintln(v)
-		fmt.Fprintf(v, "  Remote jobs: %d\n", len(gui.remoteJobs))
-		fmt.Fprintln(v, "  ────────────────")
+		fmt.Fprintf(v, "  %s %d\n", style.Coloured(style.FgGreen, "Remote jobs:"), len(gui.remoteJobs))
+		fmt.Fprintln(v, style.Coloured(style.Dim, "  ────────────────"))
 		for _, job := range gui.remoteJobs {
 			indicator := style.EnabledIndicator
 			if !job.Enabled {
@@ -384,8 +403,33 @@ func (gui *Gui) renderHints() {
 
 	switch gui.activeTab {
 	case tabLocal:
-		fmt.Fprint(v, " [c]reate [e]dit [D]elete [p]ause [/]search [Enter]detail [h/l]tab [?]help [q]uit")
+		fmt.Fprint(v, formatHints([]hintPair{
+			{"c", "reate"}, {"e", "dit"}, {"D", "elete"}, {"p", "ause"},
+			{"/", "search"}, {"Enter", "detail"}, {"h/l", "tab"}, {"?", "help"}, {"q", "uit"},
+		}))
 	case tabServers:
-		fmt.Fprint(v, " [a]dd [c]onnect [d]isconnect [D]elete [h/l]tab [?]help [q]uit")
+		fmt.Fprint(v, formatHints([]hintPair{
+			{"a", "dd"}, {"c", "onnect"}, {"d", "isconnect"}, {"D", "elete"},
+			{"h/l", "tab"}, {"?", "help"}, {"q", "uit"},
+		}))
 	}
+}
+
+// hintPair represents a key-description pair for the hints bar.
+type hintPair struct {
+	key  string
+	desc string
+}
+
+// formatHints formats hint pairs with green keys and dim descriptions.
+func formatHints(hints []hintPair) string {
+	result := " "
+	for i, h := range hints {
+		if i > 0 {
+			result += " "
+		}
+		result += style.Coloured(style.FgGreen, "["+h.key+"]")
+		result += style.Coloured(style.Dim, h.desc)
+	}
+	return result
 }

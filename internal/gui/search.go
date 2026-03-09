@@ -20,7 +20,7 @@ type searchState struct {
 func (gui *Gui) openSearch(_ *gocui.Gui, _ *gocui.View) error {
 	maxX, maxY := gui.g.Size()
 
-	v, err := gui.g.SetView(searchInputView, 0, maxY-3, maxX-1, maxY-1, 0)
+	v, err := gui.g.SetView(searchInputView, 0, maxY-3, maxX-2, maxY-1, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -28,7 +28,7 @@ func (gui *Gui) openSearch(_ *gocui.Gui, _ *gocui.View) error {
 	v.Title = " Search "
 	v.Editable = true
 	v.Frame = true
-	v.Editor = gocui.DefaultEditor
+	v.Editor = inputEditor
 
 	gui.g.Cursor = true
 	gui.search = &searchState{}
@@ -125,7 +125,7 @@ func (gui *Gui) jumpToMatch(matchIdx int) {
 	cursorIdx := jobIdx
 	viewName := gui.currentPanel()
 	if viewName == tableView {
-		cursorIdx = jobIdx + 1 // +1 for header row
+		cursorIdx = jobIdx + 2 // +2 for header + separator
 	}
 
 	v, err := gui.g.View(viewName)

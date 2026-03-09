@@ -5,6 +5,7 @@ import (
 
 	"github.com/awesome-gocui/gocui"
 	"github.com/bssmnt/lazycron/internal/cron"
+	"github.com/bssmnt/lazycron/internal/gui/style"
 	"github.com/bssmnt/lazycron/internal/ssh"
 )
 
@@ -139,24 +140,24 @@ func (gui *Gui) toggleHelp(_ *gocui.Gui, _ *gocui.View) error {
 	v.Clear()
 
 	fmt.Fprintln(v, "")
-	fmt.Fprintln(v, "  Navigation")
-	fmt.Fprintln(v, "  ──────────")
-	fmt.Fprintln(v, "  j/k, ↑/↓    Navigate list")
-	fmt.Fprintln(v, "  h/l          Switch tab (Local/Servers)")
-	fmt.Fprintln(v, "  Tab          Switch panel")
+	fmt.Fprintln(v, style.Coloured(style.FgCyan+style.Bold, "  Navigation"))
+	fmt.Fprintln(v, style.Coloured(style.Dim, "  ──────────"))
+	fmt.Fprintf(v, "  %s    %s\n", style.Coloured(style.FgGreen, "j/k, ↑/↓"), style.Coloured(style.Dim, "Navigate list"))
+	fmt.Fprintf(v, "  %s         %s\n", style.Coloured(style.FgGreen, "h/l"), style.Coloured(style.Dim, "Switch tab (Local/Servers)"))
+	fmt.Fprintf(v, "  %s         %s\n", style.Coloured(style.FgGreen, "Tab"), style.Coloured(style.Dim, "Switch panel"))
 	fmt.Fprintln(v, "")
-	fmt.Fprintln(v, "  Local Tab")
-	fmt.Fprintln(v, "  ─────────")
-	fmt.Fprintln(v, "  c/e/D/p      Create/Edit/Delete/Pause")
-	fmt.Fprintln(v, "  /            Search  n/N next/prev match")
+	fmt.Fprintln(v, style.Coloured(style.FgCyan+style.Bold, "  Local Tab"))
+	fmt.Fprintln(v, style.Coloured(style.Dim, "  ─────────"))
+	fmt.Fprintf(v, "  %s     %s\n", style.Coloured(style.FgGreen, "c/e/D/p"), style.Coloured(style.Dim, "Create/Edit/Delete/Pause"))
+	fmt.Fprintf(v, "  %s           %s\n", style.Coloured(style.FgGreen, "/"), style.Coloured(style.Dim, "Search  n/N next/prev match"))
 	fmt.Fprintln(v, "")
-	fmt.Fprintln(v, "  Servers Tab")
-	fmt.Fprintln(v, "  ───────────")
-	fmt.Fprintln(v, "  a            Add server")
-	fmt.Fprintln(v, "  c/d/D        Connect/Disconnect/Delete")
+	fmt.Fprintln(v, style.Coloured(style.FgCyan+style.Bold, "  Servers Tab"))
+	fmt.Fprintln(v, style.Coloured(style.Dim, "  ───────────"))
+	fmt.Fprintf(v, "  %s           %s\n", style.Coloured(style.FgGreen, "a"), style.Coloured(style.Dim, "Add server"))
+	fmt.Fprintf(v, "  %s       %s\n", style.Coloured(style.FgGreen, "c/d/D"), style.Coloured(style.Dim, "Connect/Disconnect/Delete"))
 	fmt.Fprintln(v, "")
-	fmt.Fprintln(v, "  r            Refresh     ? Help")
-	fmt.Fprintln(v, "  q / Ctrl+C   Quit")
+	fmt.Fprintf(v, "  %s           %s     %s %s\n", style.Coloured(style.FgGreen, "r"), style.Coloured(style.Dim, "Refresh"), style.Coloured(style.FgGreen, "?"), style.Coloured(style.Dim, "Help"))
+	fmt.Fprintf(v, "  %s  %s\n", style.Coloured(style.FgGreen, "q / Ctrl+C"), style.Coloured(style.Dim, "Quit"))
 
 	if _, err := gui.g.SetCurrentView(helpViewName); err != nil {
 		return err
