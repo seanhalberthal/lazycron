@@ -1,0 +1,26 @@
+From root@server.local Tue Jan 07 02:00:00 2025
+From: Cron Daemon <root@server.local>
+To: user@server.local
+Subject: Cron <user@server> /usr/bin/backup.sh
+Date: Tue, 07 Jan 2025 02:00:00 +0000
+Status: RO
+
+backup completed successfully
+
+From root@server.local Tue Jan 07 03:30:00 2025
+From: Cron Daemon <root@server.local>
+To: user@server.local
+Subject: Cron <user@server> /usr/bin/cleanup.sh
+Date: Tue, 07 Jan 2025 03:30:00 +0000
+
+cleanup: removed 42 temporary files
+
+From root@server.local Tue Jan 07 05:00:00 2025
+From: Cron Daemon <root@server.local>
+To: user@server.local
+Subject: Cron <user@server> /usr/bin/healthcheck.sh
+Date: Tue, 07 Jan 2025 05:00:00 +0000
+Status: O
+
+WARN: disk usage at 87%
+/dev/sda1 87% /

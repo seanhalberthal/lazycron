@@ -256,27 +256,41 @@ func (gui *Gui) renderStatus() {
 
 	version := style.Coloured(style.FgGreen, fmt.Sprintf("lazycron %s", types.Version))
 
-	var localTab, serversTab string
-	if gui.activeTab == tabLocal {
-		localTab = style.Coloured(style.FgCyan+style.Bold, "Local")
-		serversTab = style.Coloured(style.Dim, "Servers")
-	} else {
-		localTab = style.Coloured(style.Dim, "Local")
-		serversTab = style.Coloured(style.FgCyan+style.Bold, "Servers")
-	}
-
-	jobCount := ""
+	var localTab, serversTab, mailTab string
 	switch gui.activeTab {
 	case tabLocal:
-		jobCount = fmt.Sprintf("  %d jobs", len(gui.jobs))
+		localTab = style.Coloured(style.FgCyan+style.Bold, "Local")
+		serversTab = style.Coloured(style.Dim, "Servers")
+		mailTab = style.Coloured(style.Dim, "Mail")
 	case tabServers:
-		jobCount = fmt.Sprintf("  %d servers", len(gui.serversConfig.Servers))
-		if gui.activeClient != nil {
-			jobCount += fmt.Sprintf("  Connected: %s", gui.activeClient.ServerName())
-		}
+		localTab = style.Coloured(style.Dim, "Local")
+		serversTab = style.Coloured(style.FgCyan+style.Bold, "Servers")
+		mailTab = style.Coloured(style.Dim, "Mail")
+	case tabMail:
+		localTab = style.Coloured(style.Dim, "Local")
+		serversTab = style.Coloured(style.Dim, "Servers")
+		mailTab = style.Coloured(style.FgCyan+style.Bold, "Mail")
 	}
 
-	fmt.Fprintf(v, " %s\n %s  %s%s", version, localTab, serversTab, jobCount)
+	info := ""
+	switch gui.activeTab {
+	case tabLocal:
+		info = fmt.Sprintf("  %d jobs", len(gui.jobs))
+	case tabServers:
+		info = fmt.Sprintf("  %d servers", len(gui.serversConfig.Servers))
+		if gui.activeClient != nil {
+			info += fmt.Sprintf("  Connected: %s", gui.activeClient.ServerName())
+		}
+	case tabMail:
+		info = fmt.Sprintf("  %d messages", len(gui.mailMessages))
+	}
+
+	// Append mail count indicator (visible on non-mail tabs)
+	if gui.activeTab != tabMail {
+		info += gui.mailCount()
+	}
+
+	fmt.Fprintf(v, " %s\n %s  %s  %s%s", version, localTab, serversTab, mailTab, info)
 }
 
 // renderServerList writes the server list content.
@@ -412,6 +426,18 @@ func (gui *Gui) renderHints() {
 			{"a", "dd"}, {"c", "onnect"}, {"d", "isconnect"}, {"D", "elete"},
 			{"h/l", "tab"}, {"?", "help"}, {"q", "uit"},
 		}))
+	case tabMail:
+		if gui.mailActiveSource == mailSourceLocal {
+			fmt.Fprint(v, formatHints([]hintPair{
+				{"j/k", "navigate"}, {"Enter", "read"}, {"d", "elete"}, {"D", "elete all"},
+				{"S", "ource"}, {"r", "efresh"}, {"h/l", "tab"}, {"?", "help"}, {"q", "uit"},
+			}))
+		} else {
+			fmt.Fprint(v, formatHints([]hintPair{
+				{"j/k", "navigate"}, {"Enter", "read"},
+				{"S", "ource"}, {"r", "efresh"}, {"h/l", "tab"}, {"?", "help"}, {"q", "uit"},
+			}))
+		}
 	}
 }
 

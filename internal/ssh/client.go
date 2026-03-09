@@ -60,6 +60,16 @@ func (c *Client) ReadCrontab() (string, error) {
 	return output, nil
 }
 
+// ReadMail reads the remote user's mail file via `cat /var/mail/$USER`.
+// Returns empty string if no mail file exists.
+func (c *Client) ReadMail() (string, error) {
+	output, err := c.runCommand("cat /var/mail/$(whoami) 2>/dev/null || true")
+	if err != nil {
+		return "", fmt.Errorf("failed to read remote mail: %w", err)
+	}
+	return output, nil
+}
+
 // WriteCrontab writes crontab content via `crontab -` on the remote server.
 func (c *Client) WriteCrontab(content string) error {
 	if !strings.HasSuffix(content, "\n") {
