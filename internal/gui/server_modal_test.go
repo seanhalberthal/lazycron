@@ -1,7 +1,6 @@
 package gui
 
 import (
-	"os"
 	"testing"
 
 	"github.com/awesome-gocui/gocui"
@@ -10,20 +9,11 @@ import (
 
 func requireServerModalTTY(t *testing.T) *gocui.Gui {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping modal test in short mode")
-	}
-	f, err := os.Open("/dev/tty")
-	if err != nil {
-		t.Skip("skipping modal test: no TTY available")
-	}
-	_ = f.Close()
 
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	t.Cleanup(g.Close)
 	return g
 }
 

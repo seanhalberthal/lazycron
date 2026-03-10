@@ -2,29 +2,18 @@ package gui
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/awesome-gocui/gocui"
 )
 
-// requireEditorTTY skips if no TTY is available.
 func requireEditorTTY(t *testing.T) *gocui.Gui {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping editor test in short mode")
-	}
-	f, err := os.Open("/dev/tty")
-	if err != nil {
-		t.Skip("skipping editor test: no TTY available")
-	}
-	_ = f.Close()
 
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	t.Cleanup(g.Close)
 	return g
 }
 

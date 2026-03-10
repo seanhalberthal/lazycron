@@ -76,6 +76,8 @@ git ls-files --others --exclude-standard
 
 ### 5. CHANGELOG Update (User-Facing Changes)
 
+**First: tidy existing entries.** Before adding anything new, check `CHANGELOG.md` for entries under `[Unreleased]` that belong to an already-released version. Cross-reference with `git tag --sort=-v:refname` and `git log --oneline` between tags. Move any misplaced entries into their correct `[x.y.z]` section (creating the section if needed).
+
 For commits with these prefixes, update `CHANGELOG.md` before committing:
 
 - `feat:`, `add:`, `update:` — new or changed functionality
