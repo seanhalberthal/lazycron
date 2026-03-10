@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -197,5 +198,118 @@ auth_type = "key"
 
 	if config.Servers[0].Port != 22 {
 		t.Errorf("expected default port 22, got %d", config.Servers[0].Port)
+	}
+}
+
+func TestEncryptDecryptRoundTripViaConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "servers.toml")
+
+	original := "p@ssw0rd!with\"quotes"
+
+	encrypted, err := EncryptPassword(original)
+	if err != nil {
+		t.Fatalf("failed to encrypt: %v", err)
+	}
+
+	config := &ServersConfig{
+		Servers: []Server{
+			{
+				Name:     "test",
+				Host:     "example.com",
+				Port:     22,
+				User:     "user",
+				AuthType: "password",
+				Password: encrypted,
+			},
+		},
+	}
+
+	if err := SaveServers(path, config); err != nil {
+		t.Fatalf("failed to save: %v", err)
+	}
+
+	loaded, err := LoadServers(path)
+	if err != nil {
+		t.Fatalf("failed to load: %v", err)
+	}
+
+	decrypted, err := DecryptPassword(loaded.Servers[0].Password)
+	if err != nil {
+		t.Fatalf("failed to decrypt after round-trip: %v", err)
+	}
+
+	if decrypted != original {
+		t.Errorf("expected %q, got %q", original, decrypted)
+	}
+}
+
+func TestValidateServer(t *testing.T) {
+	tests := []struct {
+		name    string
+		server  Server
+		wantErr bool
+	}{
+		{
+			name:    "valid key auth",
+			server:  Server{Host: "example.com", Port: 22, User: "root", AuthType: "key"},
+			wantErr: false,
+		},
+		{
+			name:    "valid password auth",
+			server:  Server{Host: "example.com", Port: 22, User: "root", AuthType: "password"},
+			wantErr: false,
+		},
+		{
+			name:    "missing host",
+			server:  Server{Port: 22, User: "root"},
+			wantErr: true,
+		},
+		{
+			name:    "missing user",
+			server:  Server{Host: "example.com", Port: 22},
+			wantErr: true,
+		},
+		{
+			name:    "port zero",
+			server:  Server{Host: "example.com", Port: 0, User: "root"},
+			wantErr: true,
+		},
+		{
+			name:    "port too high",
+			server:  Server{Host: "example.com", Port: 70000, User: "root"},
+			wantErr: true,
+		},
+		{
+			name:    "invalid auth_type",
+			server:  Server{Host: "example.com", Port: 22, User: "root", AuthType: "magic"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.server.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestEncryptionKeyPersistence(t *testing.T) {
+	key1, err := encryptionKey()
+	if err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+	key2, err := encryptionKey()
+	if err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+	if !bytes.Equal(key1, key2) {
+		t.Error("encryptionKey() returned different keys on consecutive calls")
+	}
+	if len(key1) != 32 {
+		t.Errorf("expected 32-byte key, got %d bytes", len(key1))
 	}
 }

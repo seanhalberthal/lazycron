@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+- SSH: verify host keys against `~/.ssh/known_hosts` instead of accepting all keys
+- SSH: use random AES-GCM encryption key persisted at `~/.config/lazycron/.key`
+- SSH: validate server configuration before connecting (host, user, port, auth_type)
+- SSH: restrict private key paths to within the user's home directory
+- Replace hand-rolled TOML parser with `BurntSushi/toml`
+
+## [0.2.2]
+
+- Friendly cron syntax: human-readable schedule descriptions
+- Fix: MarkRead status header duplication
+- Close test coverage gaps
+
+## [0.2.1]
+
 - Mail tab: view, read, delete, and manage local and remote mbox mailboxes
 
 ## [0.2.0]

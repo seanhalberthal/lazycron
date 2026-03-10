@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -9,7 +10,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+
+	"github.com/BurntSushi/toml"
 )
 
 // Server represents a configured remote server.
@@ -26,6 +28,26 @@ type Server struct {
 // ServersConfig holds the list of configured servers.
 type ServersConfig struct {
 	Servers []Server `toml:"servers"`
+}
+
+// Validate checks that the server configuration has required fields and sane values.
+func (s Server) Validate() error {
+	if s.Host == "" {
+		return fmt.Errorf("host is required")
+	}
+	if s.User == "" {
+		return fmt.Errorf("user is required")
+	}
+	if s.Port < 1 || s.Port > 65535 {
+		return fmt.Errorf("port must be between 1 and 65535, got %d", s.Port)
+	}
+	if len(s.Host) > 253 {
+		return fmt.Errorf("host exceeds maximum length of 253 characters")
+	}
+	if s.AuthType != "" && s.AuthType != "key" && s.AuthType != "password" {
+		return fmt.Errorf("auth_type must be \"key\" or \"password\", got %q", s.AuthType)
+	}
+	return nil
 }
 
 // DefaultConfigDir returns the default configuration directory.
@@ -79,96 +101,68 @@ func SaveServers(path string, config *ServersConfig) error {
 	return nil
 }
 
-// parseServersToml is a minimal TOML parser for the servers config.
-// We avoid the full TOML dependency until Phase 5 by handling just what we need.
+// parseServersToml decodes TOML data into the servers config.
 func parseServersToml(data string, config *ServersConfig) error {
-	var current *Server
-	lines := strings.Split(data, "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		if line == "[[servers]]" {
-			config.Servers = append(config.Servers, Server{Port: 22})
-			current = &config.Servers[len(config.Servers)-1]
-			continue
-		}
-
-		if current == nil {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		value = strings.Trim(value, "\"")
-
-		switch key {
-		case "name":
-			current.Name = value
-		case "host":
-			current.Host = value
-		case "port":
-			fmt.Sscanf(value, "%d", &current.Port)
-		case "user":
-			current.User = value
-		case "auth_type":
-			current.AuthType = value
-		case "key_path":
-			current.KeyPath = value
-		case "password":
-			current.Password = value
+	if _, err := toml.Decode(data, config); err != nil {
+		return fmt.Errorf("failed to decode TOML: %w", err)
+	}
+	// Apply default port for servers that don't specify one
+	for i := range config.Servers {
+		if config.Servers[i].Port == 0 {
+			config.Servers[i].Port = 22
 		}
 	}
-
 	return nil
 }
 
-// serialiseServersToml converts the config to TOML format.
+// serialiseServersToml encodes the config as TOML.
 func serialiseServersToml(config *ServersConfig) string {
-	var sb strings.Builder
-	sb.WriteString("# lazycron server configuration\n\n")
-
-	for _, s := range config.Servers {
-		sb.WriteString("[[servers]]\n")
-		fmt.Fprintf(&sb, "name = %q\n", s.Name)
-		fmt.Fprintf(&sb, "host = %q\n", s.Host)
-		fmt.Fprintf(&sb, "port = %d\n", s.Port)
-		fmt.Fprintf(&sb, "user = %q\n", s.User)
-		fmt.Fprintf(&sb, "auth_type = %q\n", s.AuthType)
-		if s.KeyPath != "" {
-			fmt.Fprintf(&sb, "key_path = %q\n", s.KeyPath)
-		}
-		if s.Password != "" {
-			fmt.Fprintf(&sb, "password = %q\n", s.Password)
-		}
-		sb.WriteString("\n")
-	}
-
-	return sb.String()
+	var buf bytes.Buffer
+	buf.WriteString("# lazycron server configuration\n\n")
+	encoder := toml.NewEncoder(&buf)
+	_ = encoder.Encode(config)
+	return buf.String()
 }
 
-// encryptionKey derives a simple key from the machine. In production, this
-// should use a proper key derivation function, but for v0.0.4 this suffices.
+// keyPath returns the path to the encryption keyfile.
+func keyPath() (string, error) {
+	dir, err := DefaultConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, ".key"), nil
+}
+
+// encryptionKey loads or generates the encryption key.
+// On first run, a random 32-byte key is generated and stored at
+// ~/.config/lazycron/.key with 0600 permissions.
 func encryptionKey() ([]byte, error) {
-	home, err := os.UserHomeDir()
+	path, err := keyPath()
 	if err != nil {
 		return nil, err
 	}
-	// Use home dir path as seed — not cryptographically ideal but
-	// prevents plaintext storage. Phase 5 should improve this.
-	key := make([]byte, 32)
-	seed := []byte(home + "lazycron-server-config")
-	for i := range key {
-		key[i] = seed[i%len(seed)]
+
+	data, err := os.ReadFile(path)
+	if err == nil && len(data) == 32 {
+		return data, nil
 	}
+
+	// Generate new key
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return nil, fmt.Errorf("failed to generate encryption key: %w", err)
+	}
+
+	// Ensure directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	if err := os.WriteFile(path, key, 0600); err != nil {
+		return nil, fmt.Errorf("failed to persist encryption key: %w", err)
+	}
+
 	return key, nil
 }
 

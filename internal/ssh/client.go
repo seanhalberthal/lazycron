@@ -3,12 +3,15 @@ package ssh
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 // Client wraps an SSH connection for remote crontab management.
@@ -30,8 +33,11 @@ func NewClient(server Server) (*Client, error) {
 	addr := net.JoinHostPort(server.Host, fmt.Sprintf("%d", server.Port))
 	conn, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
+		log.Printf("ssh: connection failed to %s (%s): %v", server.Name, addr, err)
 		return nil, fmt.Errorf("failed to connect to %s: %w", addr, err)
 	}
+
+	log.Printf("ssh: connected to %s (%s@%s)", server.Name, server.User, addr)
 
 	return &Client{
 		server: server,
@@ -42,6 +48,7 @@ func NewClient(server Server) (*Client, error) {
 // Close closes the SSH connection.
 func (c *Client) Close() error {
 	if c.client != nil {
+		log.Printf("ssh: disconnected from %s", c.server.Name)
 		return c.client.Close()
 	}
 	return nil
@@ -132,8 +139,51 @@ func (c *Client) runCommand(cmd string) (string, error) {
 	return stdout.String(), nil
 }
 
+// knownHostsPath returns the path to the SSH known_hosts file.
+// Uses the system-standard ~/.ssh/known_hosts.
+func knownHostsPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".ssh", "known_hosts"), nil
+}
+
+// hostKeyCallback returns a host key callback that verifies against known_hosts.
+// If the known_hosts file doesn't exist, it creates an empty one.
+func hostKeyCallback() (ssh.HostKeyCallback, error) {
+	path, err := knownHostsPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine known_hosts path: %w", err)
+	}
+
+	// Ensure ~/.ssh directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create .ssh directory: %w", err)
+	}
+
+	// Create known_hosts if it doesn't exist
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := os.WriteFile(path, nil, 0600); err != nil {
+			return nil, fmt.Errorf("failed to create known_hosts: %w", err)
+		}
+	}
+
+	callback, err := knownhosts.New(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load known_hosts: %w", err)
+	}
+
+	return callback, nil
+}
+
 // buildSSHConfig creates an ssh.ClientConfig from a Server configuration.
 func buildSSHConfig(server Server) (*ssh.ClientConfig, error) {
+	if err := server.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid server configuration: %w", err)
+	}
+
 	var authMethods []ssh.AuthMethod
 
 	switch server.AuthType {
@@ -145,12 +195,11 @@ func buildSSHConfig(server Server) (*ssh.ClientConfig, error) {
 		authMethods = append(authMethods, ssh.PublicKeys(signer))
 
 	case "password":
-		password := server.Password
-		// Try to decrypt if it looks encrypted (hex-encoded)
-		if decrypted, err := DecryptPassword(password); err == nil {
-			password = decrypted
+		decrypted, err := DecryptPassword(server.Password)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt password for server %q: %w (re-add the server to re-encrypt)", server.Name, err)
 		}
-		authMethods = append(authMethods, ssh.Password(password))
+		authMethods = append(authMethods, ssh.Password(decrypted))
 
 	default:
 		// Try default key locations
@@ -161,33 +210,46 @@ func buildSSHConfig(server Server) (*ssh.ClientConfig, error) {
 		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
 
+	hkCallback, err := hostKeyCallback()
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup host key verification: %w", err)
+	}
+
 	return &ssh.ClientConfig{
 		User:            server.User,
 		Auth:            authMethods,
 		Timeout:         ConnectTimeout,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // User-configured servers
+		HostKeyCallback: hkCallback,
 	}, nil
 }
 
 // loadPrivateKey reads and parses a private key file.
+// The path must resolve to within the user's home directory.
 func loadPrivateKey(path string) (ssh.Signer, error) {
-	// Expand ~ to home directory
-	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		path = home + path[1:]
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	key, err := os.ReadFile(path)
+	// Expand ~ to home directory
+	if strings.HasPrefix(path, "~/") {
+		path = filepath.Join(home, path[2:])
+	}
+
+	// Canonicalise and validate
+	clean := filepath.Clean(path)
+	if !strings.HasPrefix(clean, home+string(filepath.Separator)) && clean != home {
+		return nil, fmt.Errorf("key path %q must be within home directory", path)
+	}
+
+	key, err := os.ReadFile(clean)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read key %s: %w", path, err)
+		return nil, fmt.Errorf("failed to read key %s: %w", clean, err)
 	}
 
 	signer, err := ssh.ParsePrivateKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse key %s: %w", path, err)
+		return nil, fmt.Errorf("failed to parse key %s: %w", clean, err)
 	}
 
 	return signer, nil
@@ -212,11 +274,6 @@ func loadDefaultKey() (ssh.Signer, error) {
 	}
 
 	return nil, fmt.Errorf("no default SSH key found")
-}
-
-// DialFunc allows overriding the SSH dial function for testing.
-var DialFunc = func(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	return ssh.Dial(network, addr, config)
 }
 
 // TestConnection tests connectivity to the server without running any commands.

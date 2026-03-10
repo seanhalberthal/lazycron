@@ -2,7 +2,6 @@ package gui
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -12,33 +11,36 @@ import (
 	"github.com/bssmnt/lazycron/internal/ssh"
 )
 
+func newTestGui(t *testing.T) *Gui {
+	t.Helper()
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
+	if err != nil {
+		t.Fatalf("failed to create gocui: %v", err)
+	}
+	// Note: we intentionally skip g.Close() here because Close() sends on
+	// an unbuffered stop channel that deadlocks when MainLoop was never started.
+	// The simulation screen does not hold real terminal resources.
+	return &Gui{
+		g:             g,
+		panels:        []string{tableView},
+		activeTab:     tabLocal,
+		serversConfig: &ssh.ServersConfig{},
+	}
+}
+
 func TestNewGuiCreation(t *testing.T) {
-	// Skip when no terminal is available (CI, non-interactive shells)
-	if testing.Short() {
-		t.Skip("skipping TUI test in short mode")
-	}
-	f, err := os.Open("/dev/tty")
-	if err != nil {
-		t.Skip("skipping TUI test: no TTY available")
-	}
-	_ = f.Close()
+	gui := newTestGui(t)
 
-	g, err := New()
-	if err != nil {
-		t.Fatalf("failed to create gui: %v", err)
-	}
-	defer g.g.Close()
-
-	if g.g == nil {
+	if gui.g == nil {
 		t.Fatal("expected gocui.Gui to be non-nil")
 	}
 
-	if len(g.panels) != 1 {
-		t.Errorf("expected 1 panel, got %d", len(g.panels))
+	if len(gui.panels) != 1 {
+		t.Errorf("expected 1 panel, got %d", len(gui.panels))
 	}
 
-	if g.panels[0] != tableView {
-		t.Errorf("expected first panel to be %q, got %q", tableView, g.panels[0])
+	if gui.panels[0] != tableView {
+		t.Errorf("expected first panel to be %q, got %q", tableView, gui.panels[0])
 	}
 }
 
@@ -195,7 +197,7 @@ func testJobs(n int) []*cron.CronJob {
 	jobs := make([]*cron.CronJob, n)
 	for i := range n {
 		jobs[i] = &cron.CronJob{
-			Expression: "* * * * *",
+			Expression: "0 0 1 1 *",
 			Command:    "echo test",
 			Enabled:    true,
 		}
@@ -215,19 +217,6 @@ func testServers(n int) []ssh.Server {
 		}
 	}
 	return servers
-}
-
-// requireTTY skips the test if no terminal is available.
-func requireTTY(t *testing.T) {
-	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping TUI test in short mode")
-	}
-	f, err := os.Open("/dev/tty")
-	if err != nil {
-		t.Skip("skipping TUI test: no TTY available")
-	}
-	_ = f.Close()
 }
 
 func TestSwitchTabRoundTripState(t *testing.T) {
@@ -287,13 +276,10 @@ func TestSwitchTabWrapsAround(t *testing.T) {
 }
 
 func TestTableCursorSyncAfterTabSwitch(t *testing.T) {
-	requireTTY(t)
-
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	gui := &Gui{
 		g:             g,
@@ -347,13 +333,10 @@ func TestTableCursorSyncAfterTabSwitch(t *testing.T) {
 }
 
 func TestTableCursorSyncAfterRefresh(t *testing.T) {
-	requireTTY(t)
-
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	gui := &Gui{
 		g:             g,
@@ -383,13 +366,10 @@ func TestTableCursorSyncAfterRefresh(t *testing.T) {
 }
 
 func TestServerCursorSyncAfterTabSwitch(t *testing.T) {
-	requireTTY(t)
-
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	gui := &Gui{
 		g:              g,
@@ -437,13 +417,10 @@ func TestServerCursorSyncAfterTabSwitch(t *testing.T) {
 }
 
 func TestTableCursorAtZeroSelection(t *testing.T) {
-	requireTTY(t)
-
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	gui := &Gui{
 		g:             g,
@@ -619,13 +596,10 @@ func TestPrevModalFieldNilModal(t *testing.T) {
 }
 
 func TestPrevModalFieldCycling(t *testing.T) {
-	requireTTY(t)
-
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	// Create the three input views so SetCurrentView works.
 	for _, name := range []string{nameInputView, expressionInputView, commandInputView} {
@@ -665,13 +639,10 @@ func TestPrevModalFieldCycling(t *testing.T) {
 }
 
 func TestNextAndPrevModalFieldRoundTrip(t *testing.T) {
-	requireTTY(t)
-
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	for _, name := range []string{nameInputView, expressionInputView, commandInputView} {
 		if _, err := g.SetView(name, 0, 0, 10, 2, 0); err != nil && err != gocui.ErrUnknownView {
@@ -701,13 +672,10 @@ func TestNextAndPrevModalFieldRoundTrip(t *testing.T) {
 }
 
 func TestPrevServerFieldCycling(t *testing.T) {
-	requireTTY(t)
-
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	// Create all server input views.
 	for _, name := range serverFieldOrder {
@@ -748,13 +716,10 @@ func TestPrevServerFieldCycling(t *testing.T) {
 }
 
 func TestValidateExpressionStates(t *testing.T) {
-	requireTTY(t)
-
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+	g, err := gocui.NewGui(gocui.OutputSimulator, true)
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	// Create the views that validateExpression reads/writes.
 	if _, err := g.SetView(validationView, 0, 0, 40, 2, 0); err != nil && err != gocui.ErrUnknownView {

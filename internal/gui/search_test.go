@@ -1,7 +1,6 @@
 package gui
 
 import (
-	"os"
 	"testing"
 
 	"github.com/awesome-gocui/gocui"
@@ -9,7 +8,7 @@ import (
 )
 
 func newTestGocui() (*gocui.Gui, error) {
-	return gocui.NewGui(gocui.OutputNormal, true)
+	return gocui.NewGui(gocui.OutputSimulator, true)
 }
 
 func TestNextMatchNilSearch(t *testing.T) {
@@ -45,20 +44,10 @@ func TestPrevMatchEmptyMatches(t *testing.T) {
 }
 
 func TestNextMatchWrapsAround(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping search test in short mode")
-	}
-	f, err := os.Open("/dev/tty")
-	if err != nil {
-		t.Skip("skipping search test: no TTY available")
-	}
-	_ = f.Close()
-
 	g, err := newTestGocui()
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	gui := &Gui{
 		g:        g,
@@ -86,20 +75,10 @@ func TestNextMatchWrapsAround(t *testing.T) {
 }
 
 func TestPrevMatchWrapsAround(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping search test in short mode")
-	}
-	f, err := os.Open("/dev/tty")
-	if err != nil {
-		t.Skip("skipping search test: no TTY available")
-	}
-	_ = f.Close()
-
 	g, err := newTestGocui()
 	if err != nil {
 		t.Fatalf("failed to create gocui: %v", err)
 	}
-	defer g.Close()
 
 	gui := &Gui{
 		g:        g,
