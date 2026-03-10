@@ -124,16 +124,16 @@ func (mb *Mailbox) MarkRead(index int) error {
 		return nil // Already read
 	}
 
-	// Update the Status in the raw text
-	messages[index].Status = "RO"
+	// Update the Status in the raw text — capture old status before overwriting.
+	oldStatus := messages[index].Status
 	raw := messages[index].Raw
-	if strings.Contains(raw, "Status: ") {
-		raw = strings.Replace(raw, "Status: "+messages[index].Status, "Status: RO", 1)
+
+	if oldStatus != "" && strings.Contains(raw, "Status: "+oldStatus) {
+		raw = strings.Replace(raw, "Status: "+oldStatus, "Status: RO", 1)
 	} else {
-		// Insert Status header after the first header line
+		// Insert Status header before the blank line separating headers from body
 		idx := strings.Index(raw, "\n")
 		if idx > 0 {
-			// Find end of headers (first blank line after envelope)
 			headerEnd := strings.Index(raw[idx+1:], "\n\n")
 			if headerEnd > 0 {
 				insertAt := idx + 1 + headerEnd
@@ -141,6 +141,8 @@ func (mb *Mailbox) MarkRead(index int) error {
 			}
 		}
 	}
+
+	messages[index].Status = "RO"
 	messages[index].Raw = raw
 
 	return mb.writeMessages(messages)

@@ -1,0 +1,8 @@
+From root@server.local Tue Jan 07 05:00:00 2025
+From: Cron Daemon <root@server.local>
+To: user@server.local
+Subject: Cron <user@server> /usr/bin/healthcheck.sh
+Date: Tue, 07 Jan 2025 05:00:00 +0000
+Status: O
+
+WARN: disk usage at 87%

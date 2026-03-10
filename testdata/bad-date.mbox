@@ -1,0 +1,7 @@
+From root@server.local Wed Jan 08 10:00:00 2025
+From: Cron Daemon <root@server.local>
+To: user@server.local
+Subject: Test with bad date
+Date: not-a-real-date
+
+body of message with bad date
