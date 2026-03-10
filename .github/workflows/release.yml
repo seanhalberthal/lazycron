@@ -113,7 +113,7 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           repository: seanhalberthal/homebrew-tap
           event-type: update-formula
-          client-payload: '{"version": "${{ needs.build.outputs.new_version }}", "repo": "bssmnt/lazycron"}'
+          client-payload: '{"formula": "lazycron", "version": "${{ needs.build.outputs.new_version }}"}'
 
   # Consolidation job for branch protection
   ci:
