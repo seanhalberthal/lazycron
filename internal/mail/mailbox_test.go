@@ -3,6 +3,7 @@ package mail
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -124,4 +125,99 @@ func TestMailboxDeleteNonExistent(t *testing.T) {
 	mb, _ := setupTestMailbox(t, "")
 	// DeleteAll on non-existent file — should not panic
 	_ = mb.DeleteAll() // may error on non-existent file; we just check it doesn't panic
+}
+
+func TestMailboxMarkReadAlreadyRead(t *testing.T) {
+	mb, _ := setupTestMailbox(t, "single.mbox")
+	// single.mbox has Status: RO — already read
+	if err := mb.MarkRead(0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	messages, err := mb.Read()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !messages[0].IsRead() {
+		t.Error("message should still be read")
+	}
+}
+
+func TestMailboxMarkReadUnreadNoStatusHeader(t *testing.T) {
+	mb, _ := setupTestMailbox(t, "multiple.mbox")
+	// multiple.mbox message[1] has no Status header
+	if err := mb.MarkRead(1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	messages, err := mb.Read()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !messages[1].IsRead() {
+		t.Error("expected message to be marked read")
+	}
+	if messages[1].Status != "RO" {
+		t.Errorf("expected status RO, got %q", messages[1].Status)
+	}
+}
+
+func TestMailboxMarkReadExistingStatusO(t *testing.T) {
+	mb, _ := setupTestMailbox(t, "status-o.mbox")
+	// status-o.mbox has Status: O — should be replaced, not duplicated
+	if err := mb.MarkRead(0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	messages, err := mb.Read()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !messages[0].IsRead() {
+		t.Error("expected message to be marked read")
+	}
+	// Verify no duplicate Status header
+	count := strings.Count(messages[0].Raw, "Status:")
+	if count != 1 {
+		t.Errorf("expected exactly 1 Status header, found %d", count)
+	}
+}
+
+func TestMailboxMarkReadOutOfRange(t *testing.T) {
+	mb, _ := setupTestMailbox(t, "single.mbox")
+	err := mb.MarkRead(99)
+	if err == nil {
+		t.Error("expected error for out-of-range index")
+	}
+}
+
+func TestMailboxMarkReadNegativeIndex(t *testing.T) {
+	mb, _ := setupTestMailbox(t, "single.mbox")
+	err := mb.MarkRead(-1)
+	if err == nil {
+		t.Error("expected error for negative index")
+	}
+}
+
+func TestMailboxReadPermissionDenied(t *testing.T) {
+	mb, _ := setupTestMailbox(t, "single.mbox")
+	if err := os.Chmod(mb.Path, 0000); err != nil {
+		t.Skip("cannot change file permissions")
+	}
+	t.Cleanup(func() { _ = os.Chmod(mb.Path, 0600) })
+
+	_, err := mb.Read()
+	if err == nil {
+		t.Error("expected error for unreadable file")
+	}
+}
+
+func TestMailboxDeleteReadError(t *testing.T) {
+	mb, _ := setupTestMailbox(t, "single.mbox")
+	if err := os.Chmod(mb.Path, 0000); err != nil {
+		t.Skip("cannot change file permissions")
+	}
+	t.Cleanup(func() { _ = os.Chmod(mb.Path, 0600) })
+
+	err := mb.Delete(0)
+	if err == nil {
+		t.Error("expected error when file is unreadable")
+	}
 }

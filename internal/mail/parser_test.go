@@ -177,3 +177,20 @@ func TestMessageDateString(t *testing.T) {
 		t.Errorf("zero date should return %q, got %q", "unknown", msg.DateString())
 	}
 }
+
+func TestParseBadDate(t *testing.T) {
+	text := loadFixture(t, "bad-date.mbox")
+	messages, err := Parse(text)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(messages))
+	}
+	if !messages[0].Date.IsZero() {
+		t.Error("expected zero date for unparseable Date header")
+	}
+	if messages[0].Subject != "Test with bad date" {
+		t.Errorf("subject = %q, want %q", messages[0].Subject, "Test with bad date")
+	}
+}
