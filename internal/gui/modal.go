@@ -52,7 +52,7 @@ func (gui *Gui) openCreateModal(editing bool) error {
 	if showGuide {
 		width = formWidth + guideWidth + 1 // +1 for shared border
 	}
-	height := 17
+	height := 23
 
 	x0 := maxX/2 - width/2
 	y0 := maxY/2 - height/2
@@ -228,6 +228,12 @@ func (gui *Gui) createExprGuide(x0, y0, x1, y1 int) {
 		g(green, "@daily"), g(green, "@weekly"), g(green, "@monthly"))
 	fmt.Fprintf(v, " %s %s %s\n",
 		g(green, "@yearly"), g(green, "@hourly"), g(green, "@reboot"))
+	fmt.Fprintln(v)
+	fmt.Fprintf(v, " %s\n", g(cyan, "Friendly syntax:"))
+	fmt.Fprintf(v, " %s\n", g(dim, " @freq @day @time"))
+	fmt.Fprintf(v, " %s %s\n", g(green, "@daily @9am"), g(dim, "Daily 09:00"))
+	fmt.Fprintf(v, " %s %s\n", g(green, "@weekly @tue @8pm"), g(dim, "Tue 20:00"))
+	fmt.Fprintf(v, " %s %s\n", g(green, "@hourly @:30"), g(dim, "Half past"))
 }
 
 // setupModalKeybindings registers keybindings for the create/edit modal inputs.
@@ -317,8 +323,15 @@ func (gui *Gui) saveModal(_ *gocui.Gui, _ *gocui.View) error {
 		return nil
 	}
 
+	// Expand friendly syntax — store the standard form.
+	expanded, err := cron.ExpandFriendly(expr)
+	if err != nil {
+		gui.setStatusMessage(fmt.Sprintf("Invalid expression: %v", err))
+		return nil
+	}
+
 	job := cron.CronJob{
-		Expression: expr,
+		Expression: expanded,
 		Command:    command,
 		Enabled:    true,
 		Comment:    name,
@@ -416,7 +429,15 @@ func (gui *Gui) validateExpression() {
 		return
 	}
 
-	testJob := &cron.CronJob{Expression: expr}
+	// Try friendly expansion first.
+	expanded, expandErr := cron.ExpandFriendly(expr)
+	if expandErr != nil {
+		gui.modal.exprValid = false
+		fmt.Fprint(v, style.Coloured(style.FgRed, "✗ "+expandErr.Error()))
+		return
+	}
+
+	testJob := &cron.CronJob{Expression: expanded}
 	if _, err := testJob.NextRun(); err != nil {
 		gui.modal.exprValid = false
 		fmt.Fprint(v, style.Coloured(style.FgRed, "✗ invalid expression"))
@@ -424,7 +445,14 @@ func (gui *Gui) validateExpression() {
 	}
 
 	gui.modal.exprValid = true
-	fmt.Fprint(v, style.Coloured(style.FgGreen, "✓ ")+style.Coloured(style.Dim, testJob.Describe()))
+	desc := testJob.Describe()
+	if expanded != expr {
+		// Show the expanded form so the user sees what will be saved.
+		fmt.Fprint(v, style.Coloured(style.FgGreen, "✓ ")+
+			style.Coloured(style.Dim, expanded+" — "+desc))
+	} else {
+		fmt.Fprint(v, style.Coloured(style.FgGreen, "✓ ")+style.Coloured(style.Dim, desc))
+	}
 }
 
 // openDeleteModal opens the delete confirmation modal.
