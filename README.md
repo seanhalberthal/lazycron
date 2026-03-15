@@ -1,6 +1,10 @@
 <div align="center">
 
-# lazycron
+<br>
+
+<img src=".github/assets/logo.svg" alt="lazycron" width="480">
+
+<br>
 
 **A terminal UI for managing cron jobs — locally and over SSH.**
 
