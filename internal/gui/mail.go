@@ -554,8 +554,8 @@ func (gui *Gui) mailCount() string {
 		}
 	}
 
-	if unread > 0 {
-		return fmt.Sprintf("  ✉ %d/%d", unread, total)
+	if unread == 0 {
+		return ""
 	}
-	return fmt.Sprintf("  ✉ %d", total)
+	return fmt.Sprintf("  ✉ %d/%d", unread, total)
 }

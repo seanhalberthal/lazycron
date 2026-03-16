@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- TUI: re-render views on terminal resize so column widths adapt
+- Mail: hide status bar badge when all messages are read
 - SSH: verify host keys against `~/.ssh/known_hosts` instead of accepting all keys
 - SSH: use random AES-GCM encryption key persisted at `~/.config/lazycron/.key`
 - SSH: validate server configuration before connecting (host, user, port, auth_type)
