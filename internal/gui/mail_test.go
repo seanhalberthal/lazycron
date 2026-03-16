@@ -105,12 +105,9 @@ func TestMailCountAllRead(t *testing.T) {
 		},
 	}
 	got := gui.mailCount()
-	// When all read, should just show total
-	if strings.Contains(got, "/") {
-		t.Errorf("expected no unread count, got %q", got)
-	}
-	if !strings.Contains(got, "2") {
-		t.Errorf("expected total 2, got %q", got)
+	// When all read, badge should be hidden
+	if got != "" {
+		t.Errorf("expected empty string when all read, got %q", got)
 	}
 }
 

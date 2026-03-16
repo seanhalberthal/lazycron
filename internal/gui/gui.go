@@ -57,6 +57,10 @@ type Gui struct {
 	mailMessages     []*mail.Message
 	mailSelected     int
 	mailActiveSource mailSource // local or remote
+
+	// Terminal size tracking for resize detection
+	lastWidth  int
+	lastHeight int
 }
 
 // New creates and returns a new Gui instance.
@@ -155,6 +159,11 @@ func (gui *Gui) refreshViews() {
 func (gui *Gui) layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 
+	// Detect terminal resize — re-render content when dimensions change.
+	resized := maxX != gui.lastWidth || maxY != gui.lastHeight
+	gui.lastWidth = maxX
+	gui.lastHeight = maxY
+
 	// Status bar (top row)
 	if err := gui.createStatusView(g, maxX, maxY); err != nil {
 		return err
@@ -203,6 +212,20 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 	// Hints bar (bottom row)
 	if err := gui.createHintsView(g, maxX, maxY); err != nil {
 		return err
+	}
+
+	// Re-render all view contents on resize so column widths adapt.
+	if resized {
+		switch gui.activeTab {
+		case tabLocal:
+			gui.renderTable()
+		case tabServers:
+			gui.renderServerList()
+			gui.renderDetail()
+		case tabMail:
+			gui.renderMailList()
+		}
+		gui.renderHints()
 	}
 
 	return nil
