@@ -1,11 +1,25 @@
 ## [Unreleased]
 
+- Mail: sort messages newest-first in the mail list
+- Fix: clean up mail overlay view and keybindings when switching tabs
+- Fix: reset mail source to local when disconnecting from a remote server
+- Fix: cursor highlight drift after scroll and terminal resize
+- Fix: mail delete/mark-read targets correct message when parser skips malformed entries
+
+## [0.2.5]
+
 - TUI: re-render views on terminal resize so column widths adapt
 - Mail: hide status bar badge when all messages are read
+
+## [0.2.4]
+
 - SSH: verify host keys against `~/.ssh/known_hosts` instead of accepting all keys
 - SSH: use random AES-GCM encryption key persisted at `~/.config/lazycron/.key`
 - SSH: validate server configuration before connecting (host, user, port, auth_type)
 - SSH: restrict private key paths to within the user's home directory
+
+## [0.2.3]
+
 - Replace hand-rolled TOML parser with `BurntSushi/toml`
 
 ## [0.2.2]

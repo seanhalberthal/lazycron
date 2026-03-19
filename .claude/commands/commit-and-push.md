@@ -74,11 +74,23 @@ git ls-files --others --exclude-standard
 - **If unsure**: Ask the user whether README updates are needed
 - **Do NOT skip this step** — documentation drift causes confusion
 
-### 5. CHANGELOG Update (User-Facing Changes)
+### 5. CHANGELOG Update (MANDATORY)
 
-**First: tidy existing entries.** Before adding anything new, check `CHANGELOG.md` for entries under `[Unreleased]` that belong to an already-released version. Cross-reference with `git tag --sort=-v:refname` and `git log --oneline` between tags. Move any misplaced entries into their correct `[x.y.z]` section (creating the section if needed).
+**Step A — Reconcile tags (MUST DO FIRST).** Before adding anything new, you MUST check whether entries under `[Unreleased]` actually belong to already-released versions:
 
-For commits with these prefixes, update `CHANGELOG.md` before committing:
+```bash
+git tag --sort=-v:refname | head -10
+```
+
+For each tag, check what commits it contains:
+
+```bash
+git log --oneline <previous-tag>..<tag>
+```
+
+Cross-reference those commits against `[Unreleased]` entries. **Move any entry that belongs to a released version** into its correct `[x.y.z]` section (creating the section if it doesn't exist). Do NOT leave released changes under `[Unreleased]`.
+
+**Step B — Add new entries.** For commits with these prefixes, add entries under `[Unreleased]`:
 
 - `feat:`, `add:`, `update:` — new or changed functionality
 - `fix:` — bug fixes

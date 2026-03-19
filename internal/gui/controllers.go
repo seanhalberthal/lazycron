@@ -341,6 +341,12 @@ func (gui *Gui) disconnectServer(_ *gocui.Gui, _ *gocui.View) error {
 	gui.remoteJobs = nil
 	gui.remoteSelected = 0
 
+	if gui.mailActiveSource == mailSourceRemote {
+		gui.mailActiveSource = mailSourceLocal
+		gui.mailSelected = 0
+		_ = gui.loadMailbox()
+	}
+
 	gui.setStatusMessage(fmt.Sprintf("Disconnected from %s", name))
 	gui.refreshViews()
 	return nil

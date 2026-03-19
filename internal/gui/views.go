@@ -130,6 +130,7 @@ func (gui *Gui) renderTable() {
 		return
 	}
 	v.Clear()
+	_ = v.SetOrigin(0, 0)
 
 	if len(gui.jobs) == 0 {
 		fmt.Fprintln(v, "")
@@ -300,6 +301,7 @@ func (gui *Gui) renderServerList() {
 		return
 	}
 	v.Clear()
+	_ = v.SetOrigin(0, 0)
 
 	if len(gui.serversConfig.Servers) == 0 {
 		fmt.Fprintln(v, style.Coloured(style.Dim, "  No servers configured"))

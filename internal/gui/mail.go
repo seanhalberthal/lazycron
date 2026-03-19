@@ -44,6 +44,8 @@ func (gui *Gui) loadMailbox() error {
 		return fmt.Errorf("failed to read mailbox: %w", err)
 	}
 
+	// Reverse so most recent messages appear first.
+	reverseMessages(messages)
 	gui.mailMessages = messages
 	if gui.mailSelected >= len(gui.mailMessages) {
 		gui.mailSelected = max(0, len(gui.mailMessages)-1)
@@ -94,6 +96,7 @@ func (gui *Gui) renderMailList() {
 		return
 	}
 	v.Clear()
+	_ = v.SetOrigin(0, 0)
 
 	if len(gui.mailMessages) == 0 {
 		fmt.Fprintln(v, "")
@@ -173,6 +176,19 @@ func formatMailRow(cols mailColumnWidths, status, from, subject, date string) st
 	return row
 }
 
+// reverseMessages reverses a slice of messages in place.
+func reverseMessages(msgs []*mail.Message) {
+	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+		msgs[i], msgs[j] = msgs[j], msgs[i]
+	}
+}
+
+// mailOriginalIndex converts a display index (newest-first) back to the
+// original file index (oldest-first) needed by mailbox operations.
+func (gui *Gui) mailOriginalIndex(displayIndex int) int {
+	return gui.mailMessages[displayIndex].Index
+}
+
 // mailCursorDown moves the mail list cursor down.
 func (gui *Gui) mailCursorDown(_ *gocui.Gui, v *gocui.View) error {
 	if len(gui.mailMessages) == 0 || gui.mailSelected >= len(gui.mailMessages)-1 {
@@ -222,7 +238,7 @@ func (gui *Gui) openMailDetail(_ *gocui.Gui, _ *gocui.View) error {
 
 	// Mark as read (local only)
 	if gui.mailActiveSource == mailSourceLocal && gui.mailbox != nil && !msg.IsRead() {
-		_ = gui.mailbox.MarkRead(gui.mailSelected)
+		_ = gui.mailbox.MarkRead(gui.mailOriginalIndex(gui.mailSelected))
 		msg.Status = "RO"
 		gui.renderMailList()
 	}
@@ -350,7 +366,7 @@ func (gui *Gui) deleteMail(_ *gocui.Gui, _ *gocui.View) error {
 		return nil
 	}
 
-	if err := gui.mailbox.Delete(gui.mailSelected); err != nil {
+	if err := gui.mailbox.Delete(gui.mailOriginalIndex(gui.mailSelected)); err != nil {
 		gui.setStatusMessage(fmt.Sprintf("Error deleting mail: %v", err))
 		return nil
 	}
@@ -530,6 +546,8 @@ func (gui *Gui) loadRemoteMail() {
 		return
 	}
 
+	// Reverse so most recent messages appear first.
+	reverseMessages(messages)
 	gui.mailMessages = messages
 	if gui.mailSelected >= len(gui.mailMessages) {
 		gui.mailSelected = max(0, len(gui.mailMessages)-1)
