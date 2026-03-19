@@ -19,12 +19,13 @@ func Parse(text string) ([]*Message, error) {
 	rawMessages := splitMessages(text)
 	messages := make([]*Message, 0, len(rawMessages))
 
-	for _, raw := range rawMessages {
+	for i, raw := range rawMessages {
 		msg, err := parseMessage(raw)
 		if err != nil {
 			// Skip malformed messages rather than failing entirely
 			continue
 		}
+		msg.Index = i
 		messages = append(messages, msg)
 	}
 

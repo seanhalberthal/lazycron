@@ -86,11 +86,9 @@ func New() (*Gui, error) {
 		gui.serversConfig = &ssh.ServersConfig{}
 	}
 
-	// Load mail count for status bar (best effort)
-	if mb, err := mail.DefaultMailbox(); err == nil {
-		gui.mailbox = mb
-		gui.mailMessages, _ = mb.Read()
-	}
+	// Load mail for status bar count (best effort) — use loadMailbox
+	// so messages are sorted newest-first for display.
+	_ = gui.loadMailbox()
 
 	g.SetManagerFunc(gui.layout)
 	g.Highlight = true
@@ -176,6 +174,8 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 		g.DeleteView(jobsView)
 		g.DeleteView(detailView)
 		g.DeleteView(mailListView)
+		g.DeleteView(mailOverlayView)
+		g.DeleteKeybindings(mailOverlayView)
 
 		// Full-width table
 		if err := gui.createTableView(g, maxX, maxY); err != nil {
@@ -186,6 +186,8 @@ func (gui *Gui) layout(g *gocui.Gui) error {
 		// Hide table and mail views if they exist
 		g.DeleteView(tableView)
 		g.DeleteView(mailListView)
+		g.DeleteView(mailOverlayView)
+		g.DeleteKeybindings(mailOverlayView)
 
 		// Servers list (left panel)
 		if err := gui.createServersView(g, maxX, maxY); err != nil {

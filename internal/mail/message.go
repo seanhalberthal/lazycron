@@ -6,6 +6,7 @@ import (
 
 // Message represents a single parsed mail message from an mbox file.
 type Message struct {
+	Index   int // original zero-based position in the mbox file
 	From    string
 	To      string
 	Subject string
