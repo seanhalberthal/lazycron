@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+- Mail: add `g`/`G` keybindings to jump to first/last message and top/bottom of message overlay
+
+## [0.2.6]
+
 - Mail: sort messages newest-first in the mail list
 - Fix: clean up mail overlay view and keybindings when switching tabs
 - Fix: reset mail source to local when disconnecting from a remote server

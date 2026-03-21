@@ -8,10 +8,12 @@
 
 **A terminal UI for managing cron jobs — locally and over SSH.**
 
+[![Release](https://img.shields.io/github/v/release/seanhalberthal/lazycron?style=flat&logo=github&logoColor=white&label=Release)](https://github.com/seanhalberthal/lazycron/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
-[![CI](https://img.shields.io/github/actions/workflow/status/seanhalberthal/lazycron/release.yml?branch=main&style=flat&label=CI)](https://github.com/seanhalberthal/lazycron/actions)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey?style=flat)]()
-[![Licence](https://img.shields.io/badge/licence-MIT-blue?style=flat)](LICENCE)
+[![CI](https://img.shields.io/github/actions/workflow/status/seanhalberthal/lazycron/release.yml?branch=main&style=flat&logo=githubactions&logoColor=white&label=CI)](https://github.com/seanhalberthal/lazycron/actions)
+[![macOS](https://img.shields.io/badge/macOS-supported-000000?style=flat&logo=apple&logoColor=white)]()
+[![Linux](https://img.shields.io/badge/Linux-supported-FCC624?style=flat&logo=linux&logoColor=black)]()
+[![Licence](https://img.shields.io/github/license/seanhalberthal/lazycron?style=flat&label=licence)](LICENCE)
 
 [Quick Start](#quick-start) · [Features](#features) · [Keybindings](#keybindings) · [Configuration](#configuration) · [Development](#development)
 
@@ -95,6 +97,7 @@ lazycron
 | Key | Action |
 |-----|--------|
 | `j` / `k` / `↑` / `↓` | Navigate messages |
+| `g` / `G` | Jump to first / last message |
 | `Enter` | Read message |
 | `d` | Delete message (local only) |
 | `D` | Delete all messages (local only) |
@@ -164,3 +167,9 @@ testdata/              Crontab and mbox fixtures for tests
 ```
 
 </details>
+
+---
+
+## Licence
+
+[MIT](LICENCE)

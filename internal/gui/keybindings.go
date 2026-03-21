@@ -60,6 +60,8 @@ func (gui *Gui) setupKeybindings() error {
 		{mailListView, 'k', gocui.ModNone, gui.mailCursorUp},
 		{mailListView, gocui.KeyArrowDown, gocui.ModNone, gui.mailCursorDown},
 		{mailListView, gocui.KeyArrowUp, gocui.ModNone, gui.mailCursorUp},
+		{mailListView, 'g', gocui.ModNone, gui.mailCursorFirst},
+		{mailListView, 'G', gocui.ModNone, gui.mailCursorLast},
 
 		// Mail actions
 		{mailListView, gocui.KeyEnter, gocui.ModNone, gui.openMailDetail},

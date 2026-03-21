@@ -227,6 +227,43 @@ func (gui *Gui) mailCursorUp(_ *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+// mailCursorFirst jumps to the first message in the mail list.
+func (gui *Gui) mailCursorFirst(_ *gocui.Gui, v *gocui.View) error {
+	if len(gui.mailMessages) == 0 {
+		return nil
+	}
+
+	gui.mailSelected = 0
+	_ = v.SetOrigin(0, 0)
+	_ = v.SetCursor(0, 2) // +2 for header + separator
+	return nil
+}
+
+// mailCursorLast jumps to the last message in the mail list.
+func (gui *Gui) mailCursorLast(_ *gocui.Gui, v *gocui.View) error {
+	if len(gui.mailMessages) == 0 {
+		return nil
+	}
+
+	gui.mailSelected = len(gui.mailMessages) - 1
+
+	_, viewHeight := v.Size()
+	// Total lines: header + separator + messages
+	totalLines := 2 + len(gui.mailMessages)
+	cursorY := gui.mailSelected + 2 // +2 for header + separator
+
+	if totalLines > viewHeight {
+		originY := totalLines - viewHeight
+		_ = v.SetOrigin(0, originY)
+		_ = v.SetCursor(0, cursorY-originY)
+	} else {
+		_ = v.SetOrigin(0, 0)
+		_ = v.SetCursor(0, cursorY)
+	}
+
+	return nil
+}
+
 // openMailDetail opens an overlay showing the full message body.
 // Styled to match the detail overlay and create/edit modal patterns.
 func (gui *Gui) openMailDetail(_ *gocui.Gui, _ *gocui.View) error {
@@ -293,9 +330,9 @@ func (gui *Gui) openMailDetail(_ *gocui.Gui, _ *gocui.View) error {
 
 	fmt.Fprintln(v)
 	if gui.mailActiveSource == mailSourceLocal {
-		fmt.Fprintln(v, style.Coloured(style.Dim, "   [Esc] close   [d] delete   [j/k] scroll"))
+		fmt.Fprintln(v, style.Coloured(style.Dim, "   [Esc] close   [d] delete   [j/k] scroll   [g/G] top/bottom"))
 	} else {
-		fmt.Fprintln(v, style.Coloured(style.Dim, "   [Esc] close   [j/k] scroll"))
+		fmt.Fprintln(v, style.Coloured(style.Dim, "   [Esc] close   [j/k] scroll   [g/G] top/bottom"))
 	}
 
 	if _, err := gui.g.SetCurrentView(mailOverlayView); err != nil {
@@ -321,6 +358,12 @@ func (gui *Gui) openMailDetail(_ *gocui.Gui, _ *gocui.View) error {
 	if err := gui.g.SetKeybinding(mailOverlayView, 'k', gocui.ModNone, gui.scrollMailUp); err != nil {
 		return err
 	}
+	if err := gui.g.SetKeybinding(mailOverlayView, 'g', gocui.ModNone, gui.scrollMailTop); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding(mailOverlayView, 'G', gocui.ModNone, gui.scrollMailBottom); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -341,6 +384,24 @@ func (gui *Gui) scrollMailUp(_ *gocui.Gui, v *gocui.View) error {
 		if err := v.SetOrigin(ox, oy-1); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// scrollMailTop scrolls the mail overlay to the top.
+func (gui *Gui) scrollMailTop(_ *gocui.Gui, v *gocui.View) error {
+	_ = v.SetOrigin(0, 0)
+	return nil
+}
+
+// scrollMailBottom scrolls the mail overlay to the bottom.
+func (gui *Gui) scrollMailBottom(_ *gocui.Gui, v *gocui.View) error {
+	_, viewHeight := v.Size()
+	lines := v.ViewBufferLines()
+	totalLines := len(lines)
+
+	if totalLines > viewHeight {
+		_ = v.SetOrigin(0, totalLines-viewHeight)
 	}
 	return nil
 }
