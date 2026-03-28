@@ -8,12 +8,12 @@
 
 **A terminal UI for managing cron jobs — locally and over SSH.**
 
-[![Release](https://img.shields.io/github/v/release/seanhalberthal/lazycron?style=flat&logo=github&logoColor=white&label=Release)](https://github.com/seanhalberthal/lazycron/releases/latest)
-[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
 [![CI](https://img.shields.io/github/actions/workflow/status/seanhalberthal/lazycron/release.yml?branch=main&style=flat&logo=githubactions&logoColor=white&label=CI)](https://github.com/seanhalberthal/lazycron/actions)
-[![macOS](https://img.shields.io/badge/macOS-supported-000000?style=flat&logo=apple&logoColor=white)]()
-[![Linux](https://img.shields.io/badge/Linux-supported-FCC624?style=flat&logo=linux&logoColor=black)]()
-[![Licence](https://img.shields.io/github/license/seanhalberthal/lazycron?style=flat&label=licence)](LICENCE)
+[![Release](https://img.shields.io/github/v/release/seanhalberthal/lazycron?style=flat&logo=github&logoColor=white&label=Release&color=16A34A)](https://github.com/seanhalberthal/lazycron/releases/latest)
+[![Licence](https://img.shields.io/github/license/seanhalberthal/lazycron?style=flat&label=licence&color=16A34A)](LICENCE)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev)
+[![macOS](https://img.shields.io/badge/macOS-supported-6e7681?style=flat&logo=apple&logoColor=white)]()
+[![Linux](https://img.shields.io/badge/Linux-supported-6e7681?style=flat&logo=linux&logoColor=white)]()
 
 [Quick Start](#quick-start) · [Features](#features) · [Keybindings](#keybindings) · [Configuration](#configuration) · [Development](#development)
 
